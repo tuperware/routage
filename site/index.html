@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Routage</title>
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+<link href="style.css?v=142" rel="stylesheet">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#1f5f8b">
+<meta name="mobile-web-app-capable" content="yes">
+</head>
+<body>
+<div id="map" aria-label="Carte"></div>
+<div class="wave-scale" id="wave-legend" hidden>
+  <span><i style="background:#40aacd"></i>0,5</span><span><i style="background:#1e78be"></i>1</span><span><i style="background:#2846aa"></i>1,5</span><span><i style="background:#f2be28"></i>2</span><span><i style="background:#ee781e"></i>3</span><span><i style="background:#d63223"></i>4</span><span><i style="background:#82143c"></i>6 m</span>
+  <b>&raquo; = sens des vagues</b>
+</div>
+<div class="wave-scale cur-scale" id="cur-legend" hidden><b>Courant en nœuds, flèche = sens où il va (marée comprise)</b><span class="cur-warn">Peu fiable près des côtes (modèle à 8 km)</span></div>
+<div class="wave-scale chart-scale" id="chart-legend" hidden>
+  <div class="chart-seg" role="group" aria-label="Type de carte marine">
+    <button type="button" id="chart-osm" aria-pressed="true">Balises</button>
+    <button type="button" id="chart-sea" aria-pressed="false">Seamap</button>
+    <button type="button" id="chart-shom" aria-pressed="false">SHOM</button>
+  </div>
+  <div class="chart-txt"><b id="chart-title">Balises et feux OpenSeaMap, sondes EMODnet (50 m et plus)</b><span class="cur-warn" id="chart-warn">Non officielle : ne remplace pas les cartes du SHOM</span></div>
+</div>
+<div class="wave-fab" id="wave-fab">
+  <button type="button" class="fab-btn fab-undo" id="undo-pt" hidden aria-label="Retirer le dernier point">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9 7H4V2M4.6 7A8 8 0 1 1 4 13" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>Retirer point</span>
+  </button>
+  <button type="button" class="fab-btn" id="ruler-btn" aria-pressed="false" aria-label="Mesurer distance et cap">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 16 16 3l5 5L8 21zM7 12l2 2M10 9l2 2M13 6l2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    <span>Mesure</span>
+  </button>
+  <button type="button" class="fab-btn" id="tide-btn" aria-pressed="false" aria-label="Courbe des marées">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M2 14c2.5-6 5.5-6 8 0s5.5 6 8 0 2.5-3 4-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M12 3v4M10 5l2 2 2-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>Marée</span>
+  </button>
+  <button type="button" class="fab-btn" id="wx-btn" aria-pressed="false" aria-label="Afficher la météo">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    <span>Météo</span>
+  </button>
+  <button type="button" class="fab-btn" id="wave-toggle" hidden aria-pressed="false" aria-label="Afficher les vagues">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M2 9c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2M2 15c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    <span>Vagues</span>
+  </button>
+  <button type="button" class="fab-btn" id="cur-toggle" hidden aria-pressed="false" aria-label="Afficher le courant">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 8h13M12 4l4 4-4 4M3 16h10M9 12l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>Courant</span>
+  </button>
+  <button type="button" class="fab-btn" id="chart-btn" aria-pressed="false" aria-label="Afficher la carte marine">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v15M8 9h8M5 13a7 7 0 0 0 14 0M12 5a1.8 1.8 0 1 0 0-.01" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="3.8" r="1.8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    <span>Carte</span>
+  </button>
+
+</div>
+
+<div class="ruler-box" id="ruler-box" hidden>
+  <div class="ruler-val" id="ruler-val" role="status" aria-live="polite">Touchez 2 points sur la carte</div>
+  <button type="button" class="ruler-close" id="ruler-close" aria-label="Fermer la mesure">Fermer</button>
+</div>
+<div class="tide-box" id="tide-box" hidden>
+  <div class="tide-head"><div class="tide-ttl" id="tide-ttl" role="status" aria-live="polite">Touchez la mer à l'endroit voulu</div><button type="button" class="ruler-close" id="tide-close" aria-label="Fermer la marée">Fermer</button></div>
+  <div class="tide-body" id="tide-body" hidden>
+    <div class="tide-ext" id="tide-ext"></div>
+    <svg class="tide-svg" id="tide-svg" aria-hidden="true"></svg>
+    <div class="tide-tz" id="tide-tz"><div class="chart-seg tz-seg" role="group" aria-label="Heures affichées"><button type="button" id="tz-lieu" aria-pressed="true">Lieu</button><button type="button" id="tz-app" aria-pressed="false">Appareil</button><button type="button" id="tz-utc" aria-pressed="false">UTC</button></div><div id="tide-tz-txt"></div></div>
+    <div class="tide-hint">Touchez ou glissez sur la courbe pour lire l'heure et la hauteur.</div>
+    <div class="tide-note">Hauteur par rapport au niveau moyen de la mer, pas au zéro des cartes. Modèle Météo-France à 8 km (Open-Meteo) : indicatif, ne remplace pas l'annuaire des marées du SHOM.</div>
+  </div>
+</div>
+<div class="wx-bar" id="wx-bar" hidden>
+  <div class="wx-head"><select id="wx-model" aria-label="Modèle météo"></select><button type="button" class="wx-close" id="wx-close" aria-label="Fermer la météo">Fermer</button></div>
+  <div class="wx-time" id="wx-time" role="status" aria-live="polite">–</div>
+  <div class="scrub-row">
+    <button type="button" class="navbtn playbtn" id="wx-play" aria-label="Lecture" aria-pressed="false"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path class="i-play" d="M7 4.5v15l12.5-7.5z" fill="currentColor"/><path class="i-pause" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></svg></button>
+    <button type="button" class="navbtn" id="wx-prev" aria-label="Heure précédente">&#8249;</button>
+    <input type="range" id="wx-range" min="0" max="1" value="0" step="1" aria-label="Heure de la prévision" disabled>
+    <button type="button" class="navbtn" id="wx-next" aria-label="Heure suivante">&#8250;</button>
+  </div>
+</div>
+<aside class="panel collapsed" id="panel">
+  <button type="button" class="sheet-handle" id="sheet-handle" aria-expanded="false" aria-controls="panel"><span class="grab" aria-hidden="true"></span><span id="sheet-label">Plus d'options</span></button>
+  <div class="peek" id="peek"></div>
+  <header class="panel-head">
+    <h1>Routage</h1>
+    <p class="hint" id="hint">Touchez la carte pour placer le départ.</p>
+  </header>
+
+  <ol class="steps">
+    <li class="step" id="step-start">
+      <span class="dot dot-start" aria-hidden="true"></span>
+      <div>
+        <div class="label">Départ</div>
+        <div class="value" id="v-start">Touchez la carte</div>
+      </div>
+    </li>
+    <li class="vias-li" hidden><ol class="steps vias" id="step-vias"></ol></li>
+    <li class="step" id="step-end">
+      <span class="dot dot-end" aria-hidden="true"></span>
+      <div>
+        <div class="label">Arrivée</div>
+        <div class="value" id="v-end">Le dernier point de la route</div>
+      </div>
+    </li>
+  </ol>
+
+  <label class="field models">
+    <span class="label">Modèle météo</span>
+    <select id="models" aria-label="Modèle météo"></select>
+  </label>
+
+  <label class="field">
+    <span class="label">Heure de départ</span>
+    <input type="datetime-local" id="t-start">
+  </label>
+
+  <details class="settings" id="settings">
+    <summary><span>Réglages bateau</span><span class="set-sum" id="set-sum"></span></summary>
+    <div class="set-body">
+      <div class="set-row col">
+        <span><b>Polaire de base</b></span>
+        <p class="pk-now" id="pk-now">Tiki 38 – Chargé</p>
+        <div class="seg pk pk3" id="o-pk" data-v="c"><span class="pk-h">Tiki 38</span><button type="button" data-v="c">Chargé</button><button type="button" data-v="l">Léger</button><span class="pk-h pk-xo">Autre bateau</span><button type="button" data-v="x" id="o-x-btn" class="pk-x pk-xo"></button></div>
+        <div class="px-row"><button type="button" class="btn" id="o-x-change">+ Importer la polaire d'un autre bateau</button></div>
+        <small class="pk-txt" id="o-pk-txt"></small>
+        <p class="px-msg" id="o-x-msg" role="status" aria-live="polite"></p>
+        <input type="file" id="o-file" accept=".pol,.csv,.txt,text/plain,text/csv" hidden>
+      </div>
+      <details class="set-row sub-fold" id="ico-fold">
+        <summary><span><b>Icône du bateau</b><small>Le bateau dessiné sur la route</small></span><span class="ico-cur"><i class="ico-pv" id="ico-cur-pv"></i><span id="ico-cur-txt">Tiki 38</span></span></summary>
+        <div class="seg ico" id="o-ico" data-v="t"><button type="button" data-v="t"><i class="ico-pv"></i>Tiki 38</button><button type="button" data-v="c"><i class="ico-pv"></i>Catamaran</button><button type="button" data-v="m"><i class="ico-pv"></i>Monocoque</button></div>
+      </details>
+      <div class="set-row col">
+        <span><b>Transformer la polaire</b><small>100 % = polaire d'origine</small></span>
+        <label class="slide"><span>Près <small>jusqu'à 60°</small></span><input type="range" id="o-cp" min="50" max="130" step="5" value="100"><output id="v-cp">100 %</output></label>
+        <label class="slide"><span>Travers <small>vers 90°</small></span><input type="range" id="o-ct" min="50" max="130" step="5" value="100"><output id="v-ct">100 %</output></label>
+        <label class="slide"><span>Portant <small>dès 135°</small></span><input type="range" id="o-cd" min="50" max="130" step="5" value="100"><output id="v-cd">100 %</output></label>
+        <label class="slide"><span>Petit temps <small>6 nds et moins</small></span><input type="range" id="o-cl" min="50" max="130" step="5" value="100"><output id="v-cl">100 %</output></label>
+        <figure class="pol-fig">
+          <svg id="pol-svg" viewBox="0 0 132 238" role="img" aria-label="Dessin de la polaire"></svg>
+          <figcaption>
+            <span><i class="sw" style="background:#7fa7c4"></i>6 nds</span><span><i class="sw" style="background:#1f5f8b"></i>10 nds</span>
+            <span><i class="sw" style="background:#d98a00"></i>16 nds</span><span><i class="sw" style="background:#b8322a"></i>25 nds</span>
+            <span class="small" id="pol-leg">Trait plein : votre polaire. Pointillés : Chargé d'origine. Vitesses en nœuds.</span>
+          </figcaption>
+        </figure>
+        <button type="button" class="btn" id="o-reset">Revenir à la polaire d'origine</button>
+      </div>
+      <label class="set-row">
+        <span><b>Toutes allures</b><small>Dégrader si bateau chargé, carène sale, équipage prudent</small></span>
+        <span class="num"><input type="number" id="o-pol" min="40" max="110" step="5" value="100" inputmode="numeric"><i>%</i></span>
+      </label>
+      <label class="set-row">
+        <span><b>Vent max</b><small>La route évite les zones plus ventées</small></span>
+        <span class="num"><input type="number" id="o-wmax" min="10" max="60" step="1" value="35" inputmode="numeric"><i>nds</i></span>
+      </label>
+      <div class="set-row col">
+        <span><b>Courant</b><small>Courant de marée compris (Météo-France, maille 8 km, 10 jours). Peu fiable près des côtes : ne remplace pas l'annuaire des marées.</small></span>
+        <div class="seg pk" id="o-cur" data-v="1"><button type="button" data-v="1">Avec courant</button><button type="button" data-v="0">Sans courant</button></div>
+      </div>
+      <div class="set-row col spi-set">
+        <span><b>Spi à bord</b><small>Sans spi : polaire sans spi (gréement de route 54,6 m² à toutes les allures), plus lente au portant. <a href="polaires/tiki38_charge_sans_spi.pol" download>Fichier .pol</a></small></span>
+        <div class="seg pk" id="o-spi" data-v="1"><button type="button" data-v="1">Avec spi</button><button type="button" data-v="0">Sans spi</button></div>
+      </div>
+      <label class="set-row spi-row">
+        <span><b>Spi (light) jusqu'à</b><small>Au-delà, le plan de voilure conseille le plein 54,6 m². Votre choix : ce seuil n'est pas sur les plans</small></span>
+        <span class="num"><input type="number" id="o-cx" min="5" max="40" step="1" value="20" inputmode="numeric"><i>nds</i></span>
+      </label>
+      <label class="set-row">
+        <span><b>Distance à la côte</b><small>La route reste à cette distance de la terre (50 m près du départ et de l'arrivée, pour sortir du port). Votre choix, hors plans</small></span>
+        <span class="num"><input type="number" id="o-coast" min="50" max="2000" step="50" value="300" inputmode="numeric"><i>m</i></span>
+      </label>
+      <label class="set-row">
+        <span><b>Profondeur mini</b><small>La route évite les fonds plus petits et les dangers balisés (cardinales, épaves, roches). Fonds approximatifs, pas au zéro des cartes ; 0 = sans. Votre choix, hors plans</small></span>
+        <span class="num"><input type="number" id="o-dmin" min="0" max="20" step="0.5" value="2" inputmode="decimal"><i>m</i></span>
+      </label>
+      <label class="set-row">
+        <span><b>Vagues max</b><small>La route évite les zones où les vagues sont plus hautes</small></span>
+        <span class="num"><input type="number" id="o-hmax" min="0.5" max="12" step="0.5" value="4" inputmode="decimal"><i>m</i></span>
+      </label>
+      <label class="set-row check">
+        <span><b>Moteur autorisé</b><small>Si la voile ne donne pas assez de vitesse</small></span>
+        <input type="checkbox" id="o-eng">
+      </label>
+      <label class="set-row eng">
+        <span><b>Vitesse mini sous voile</b><small>En dessous, on passe au moteur</small></span>
+        <span class="num"><input type="number" id="o-min" min="0.5" max="10" step="0.5" value="3" inputmode="decimal"><i>nds</i></span>
+      </label>
+      <label class="set-row eng">
+        <span><b>Vitesse moteur</b></span>
+        <span class="num"><input type="number" id="o-engs" min="1" max="12" step="0.5" value="5" inputmode="decimal"><i>nds</i></span>
+      </label>
+      <button type="button" class="btn-save" id="o-save">Enregistrer</button>
+      <p class="small" id="o-note" hidden>Ce navigateur ne garde pas les réglages. Ouvrez la page dans Chrome, ou ajoutez-la à l'écran d'accueil (menu ⋮ › « Ajouter à l'écran d'accueil ») : l'icône garde vos réglages.</p>
+    </div>
+  </details>
+
+  <div class="go-row">
+    <button class="btn-primary" id="go" disabled>Calculer la route</button>
+    <button class="btn btn-reset" id="reset-top" type="button" aria-label="Effacer et refaire un routage" title="Effacer et refaire un routage">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Reset</span>
+    </button>
+  </div>
+  <button class="btn btn-cmp" id="cmp-jump" type="button">
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 8h13l-3-3M20 16H7l3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>Comparer deux modèles</span>
+  </button>
+
+  <section class="result" id="result" data-tab="resume" hidden>
+    <div class="quick" id="quick">
+      <button type="button" class="q-btn q-main" id="wp-less"><span id="wp-less-t">Nettoyer</span><small id="wp-count"></small></button>
+      <button type="button" class="q-btn" id="wp-more">Annuler</button>
+      <button type="button" class="q-btn q-gpx" id="gpx">Enregistrer<small>GPX</small></button>
+      <button type="button" class="q-btn q-share" id="q-share" hidden aria-label="Partager le GPX"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="18" cy="5" r="2.6" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="6" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="18" cy="19" r="2.6" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M8.3 10.8l7.4-4.4M8.3 13.2l7.4 4.4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><small>Partager</small></button>
+      <button type="button" class="q-btn q-reset" id="q-reset" aria-label="Reset : effacer la route"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><small>Reset</small></button>
+    </div>
+    <div id="gpx-help" hidden><span id="gpx-name"></span><button id="gpx-dl" type="button"></button><p id="gpx-ok"></p><button id="gpx-share" type="button"></button><p id="gpx-send"></p><button id="gpx-copy" type="button"></button></div>
+
+    <div class="tabs" id="tabs" role="tablist">
+      <button type="button" role="tab" data-t="resume" aria-selected="true">Résumé</button>
+      <button type="button" role="tab" data-t="route" aria-selected="false">Feuille de route</button>
+      <button type="button" role="tab" data-t="voile" aria-selected="false">Voilure</button>
+      <button type="button" role="tab" data-t="analyse" aria-selected="false">Analyse</button>
+    </div>
+    <div class="pane" data-pane="resume">
+    <div class="kpis">
+      <div><div class="label">Durée</div><div class="kpi" id="r-dur">–</div></div>
+      <div><div class="label">Arrivée</div><div class="kpi" id="r-eta">–</div></div>
+      <div><div class="label">Distance</div><div class="kpi" id="r-dist">–</div></div>
+      <div><div class="label">Vent max</div><div class="kpi" id="r-wind">–</div></div>
+      <div><div class="label">Vagues max</div><div class="kpi" id="r-wave">–</div></div>
+      <div class="kpi-motor" id="r-motor" hidden></div>
+    </div>
+    <p class="cur-note" id="r-cur" hidden></p>
+    <div class="relaunch">
+      <label class="field"><span class="label">Changer l'heure de départ</span><input type="datetime-local" id="r-tstart"></label>
+      <button type="button" class="btn-primary" id="r-go">Relancer</button>
+    </div>
+
+    </div>
+
+    <div class="scrub">
+      <div class="now" id="scrub-info">
+        <div class="now-time" id="now-time">–</div>
+        <div class="now-grid">
+          <div><span class="label">Cap</span><b id="now-hdg">–</b></div>
+          <div><span class="label">Vitesse</span><b id="now-bsp">–</b></div>
+          <div><span class="label">Vent</span><b id="now-tws">–</b></div>
+          <div><span class="label">Allure</span><b id="now-twa">–</b></div>
+          <div class="wide"><span class="label">Vagues</span><b id="now-wave">–</b></div>
+          <div class="wide"><span class="label">Voilure</span><b id="now-sail">–</b></div>
+          <div class="wide" id="now-cur-row" hidden><span class="label">Courant</span><b id="now-cur">–</b></div>
+        </div>
+      </div>
+      <div class="scrub-row">
+        <button type="button" class="navbtn playbtn" id="play" aria-label="Lecture" aria-pressed="false"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path class="i-play" d="M7 4.5v15l12.5-7.5z" fill="currentColor"/><path class="i-pause" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></svg></button>
+        <button type="button" class="navbtn" id="prev" aria-label="Point précédent">&#8249;</button>
+        <input type="range" id="scrub" min="0" max="100" value="0" aria-label="Position dans le temps">
+        <button type="button" class="navbtn" id="next" aria-label="Point suivant">&#8250;</button>
+      </div>
+    </div>
+    <div class="pane" data-pane="resume">
+    <details class="book analyse cmp" id="cmp-box">
+      <summary>Comparer deux modèles</summary>
+      <p class="an-note">Même départ, même arrivée, mêmes réglages, avec un autre modèle météo.</p>
+      <div class="cmp-row">
+        <select id="cmp-model" aria-label="Deuxième modèle"></select>
+        <button class="btn-primary" id="cmp-go" type="button">Comparer</button>
+      </div>
+      <div id="cmp-out"></div>
+    </details>
+    <div class="actions">
+      <button class="btn" id="reset">Recommencer</button>
+    </div>
+    </div>
+    <div class="pane" data-pane="route">
+    <div class="book">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>N°</th><th>Heure</th><th id="th-cap">Cap</th><th>Dist.<br>M</th><th>Vent<br>nds</th><th>Vagues<br>m</th><th>Angle</th><th>Vit.<br>nds</th><th id="th-cur" hidden>Cour.<br>nds</th></tr></thead>
+          <tbody id="book"></tbody>
+        </table>
+      </div>
+      <p class="book-note" id="book-cur" hidden></p>
+      <p class="book-note" id="book-note" hidden></p>
+    </div>
+    </div>
+    <div class="pane" data-pane="voile">
+    <div class="book analyse sails">
+      <div id="sail-plan"></div>
+    </div>
+    </div>
+    <div class="pane" data-pane="analyse">
+    <div class="book analyse">
+      <div id="analyse"></div>
+    </div>
+    </div>
+  </section>
+
+  <p class="msg" id="msg" role="status" aria-live="polite"></p>
+
+  <div class="install" id="install-box">
+    <button type="button" class="btn-save" id="install" hidden>Installer l'icône sur l'écran d'accueil</button>
+    <p class="small" id="install-hint">Pour avoir l'app en plein écran : dans Chrome, menu ⋮ › « Ajouter à l'écran d'accueil » (ou « Installer l'application »).</p>
+  </div>
+
+  <footer class="foot">
+   <details class="foot-src"><summary>Sources et limites</summary>
+    Vent : <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>, 10 m. Vagues : <a href="https://open-meteo.com/en/docs/marine-weather-api" target="_blank" rel="noopener">Open-Meteo Marine</a> (MFWAM Météo-France avec AROME et ARPEGE, ECMWF WAM, GFS Wave, DWD EWAM), hauteur significative, peu fiable près des côtes.
+    Côtes : Natural Earth 1:10 m et OpenStreetMap près des côtes. Fonds et dangers : © <a href="https://openwaters.io/charts/seascape" target="_blank" rel="noopener">Open Waters: Seascape</a> (CC BY 4.0), OpenSeaMap. Aide à la préparation : ne remplace pas les cartes marines.
+    Polaire : Tiki 38, chargé ou léger, ou la vôtre.
+    <br>Logiciel libre © Tup, licence GPL-3.0 : <a href="sauvegarde/Routage_code_source.zip" download>code source (zip)</a>.
+   </details>
+  </footer>
+</aside>
+
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script src="polar.js?v=142"></script>
+<script src="reefs.js?v=142"></script>
+<script src="app.js?v=142"></script>
+</body>
+</html>

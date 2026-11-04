@@ -1,0 +1,1 @@
+{"name":"routage-tiki38","productName":"Routage","version":"1.5.0","main":"main.js","description":"Routage","devDependencies":{"@electron/packager":"^18.4.4","electron":"^33.4.11"}}
