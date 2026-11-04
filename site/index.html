@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet">
 <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
-<link href="style.css?v=142" rel="stylesheet">
+<link href="style.css?v=147" rel="stylesheet">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -29,6 +29,7 @@
   </div>
   <div class="chart-txt"><b id="chart-title">Balises et feux OpenSeaMap, sondes EMODnet (50 m et plus)</b><span class="cur-warn" id="chart-warn">Non officielle : ne remplace pas les cartes du SHOM</span></div>
 </div>
+<div class="gps-chip" id="gps-chip" hidden></div>
 <div class="wave-fab" id="wave-fab">
   <button type="button" class="fab-btn fab-undo" id="undo-pt" hidden aria-label="Retirer le dernier point">
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9 7H4V2M4.6 7A8 8 0 1 1 4 13" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -58,6 +59,10 @@
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v15M8 9h8M5 13a7 7 0 0 0 14 0M12 5a1.8 1.8 0 1 0 0-.01" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="3.8" r="1.8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
     <span>Carte</span>
   </button>
+  <button type="button" class="fab-btn" id="gps-btn" aria-pressed="false" aria-label="Ma position GPS">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <span>Position</span>
+  </button>
 
 </div>
 
@@ -68,11 +73,12 @@
 <div class="tide-box" id="tide-box" hidden>
   <div class="tide-head"><div class="tide-ttl" id="tide-ttl" role="status" aria-live="polite">Touchez la mer à l'endroit voulu</div><button type="button" class="ruler-close" id="tide-close" aria-label="Fermer la marée">Fermer</button></div>
   <div class="tide-body" id="tide-body" hidden>
+    <label class="tide-sonde"><span>Sonde lue sur la carte</span><span class="num"><input type="number" id="tide-s" min="0" max="200" step="0.1" inputmode="decimal" placeholder="?"><i>m</i></span></label>
     <div class="tide-ext" id="tide-ext"></div>
     <svg class="tide-svg" id="tide-svg" aria-hidden="true"></svg>
     <div class="tide-tz" id="tide-tz"><div class="chart-seg tz-seg" role="group" aria-label="Heures affichées"><button type="button" id="tz-lieu" aria-pressed="true">Lieu</button><button type="button" id="tz-app" aria-pressed="false">Appareil</button><button type="button" id="tz-utc" aria-pressed="false">UTC</button></div><div id="tide-tz-txt"></div></div>
     <div class="tide-hint">Touchez ou glissez sur la courbe pour lire l'heure et la hauteur.</div>
-    <div class="tide-note">Hauteur par rapport au niveau moyen de la mer, pas au zéro des cartes. Modèle Météo-France à 8 km (Open-Meteo) : indicatif, ne remplace pas l'annuaire des marées du SHOM.</div>
+    <div class="tide-note"><b>Eau = sonde de la carte + chiffre de la marée.</b> Indicatif : gardez de la marge.</div>
   </div>
 </div>
 <div class="wx-bar" id="wx-bar" hidden>
@@ -197,6 +203,10 @@
         <span><b>Vitesse moteur</b></span>
         <span class="num"><input type="number" id="o-engs" min="1" max="12" step="0.5" value="5" inputmode="decimal"><i>nds</i></span>
       </label>
+      <label class="set-row eng">
+        <span><b>Moteur face au vent jusqu'à</b><small>Au-delà, pas de moteur à moins de 60° du vent (mer de face). Votre choix, hors plans</small></span>
+        <span class="num"><input type="number" id="o-engw" min="0" max="60" step="1" value="15" inputmode="decimal"><i>nds</i></span>
+      </label>
       <button type="button" class="btn-save" id="o-save">Enregistrer</button>
       <p class="small" id="o-note" hidden>Ce navigateur ne garde pas les réglages. Ouvrez la page dans Chrome, ou ajoutez-la à l'écran d'accueil (menu ⋮ › « Ajouter à l'écran d'accueil ») : l'icône garde vos réglages.</p>
     </div>
@@ -235,15 +245,18 @@
       <div><div class="label">Durée</div><div class="kpi" id="r-dur">–</div></div>
       <div><div class="label">Arrivée</div><div class="kpi" id="r-eta">–</div></div>
       <div><div class="label">Distance</div><div class="kpi" id="r-dist">–</div></div>
-      <div><div class="label">Vent max</div><div class="kpi" id="r-wind">–</div></div>
+      <div><div class="label">Vent max</div><div class="kpi" id="r-wind">–</div><div class="kpi-sub" id="r-gust"></div></div>
       <div><div class="label">Vagues max</div><div class="kpi" id="r-wave">–</div></div>
       <div class="kpi-motor" id="r-motor" hidden></div>
     </div>
+    <p class="cur-note warn" id="r-gustw" hidden></p>
     <p class="cur-note" id="r-cur" hidden></p>
     <div class="relaunch">
       <label class="field"><span class="label">Changer l'heure de départ</span><input type="datetime-local" id="r-tstart"></label>
       <button type="button" class="btn-primary" id="r-go">Relancer</button>
     </div>
+    <button type="button" class="btn-best" id="best-go">Trouver la meilleure heure de départ</button>
+    <div id="best-out"></div>
 
     </div>
 
@@ -323,8 +336,8 @@
 </aside>
 
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-<script src="polar.js?v=142"></script>
-<script src="reefs.js?v=142"></script>
-<script src="app.js?v=142"></script>
+<script src="polar.js?v=147"></script>
+<script src="reefs.js?v=147"></script>
+<script src="app.js?v=147"></script>
 </body>
 </html>

@@ -144,7 +144,7 @@
   }
 
   // ---------- Réglages bateau ----------
-  const OPT = { hmax: 4, pol: 1, wmax: 35, eng: false, min: 3, engs: 5, pk: 'c', cx: 20, coast: 300, dmin: 2, spi: true, cp: 1, ct: 1, cd: 1, cl: 1 };
+  const OPT = { hmax: 4, pol: 1, wmax: 35, eng: false, min: 3, engs: 5, engw: 15, pk: 'c', cx: 20, coast: 300, dmin: 2, spi: true, cp: 1, ct: 1, cd: 1, cl: 1 };
   const lerp = (a, b, f) => a + (b - a) * f;
   // Coefficient selon l'allure : près jusqu'à 60°, travers à 90°, portant à partir de 135°, transition linéaire entre deux.
   function allureCoef(twa, o = OPT) {
@@ -170,9 +170,11 @@
   function boatSpeed(twa, tws) {
     if (tws > OPT.wmax) return { s: 0, m: false };
     const v = sailSpeed(twa, tws);
-    if (OPT.eng && v < OPT.min) return { s: OPT.engs, m: true };
+    if (OPT.eng && v < OPT.min && motOk(twa, tws)) return { s: OPT.engs, m: true };
     return { s: v, m: false };
   }
+  // Moteur face au vent : au-delà du seuil choisi (OPT.engw), pas de moteur à moins de 60° du vent
+  function motOk(twa, tws) { return tws <= OPT.engw || Math.abs(norm180(twa)) >= 60; }
 
   // ---------- Masque terre (Natural Earth 1:10 m, 120 px par degré) ----------
   const MASK_RES = 120, TILE = 10;
@@ -689,7 +691,7 @@
         // Ligne droite impossible à la voile (face au vent ou vent arrière) : on tire des bords dans le passage
         let vmg = 0, bs = { s: 0, m: false }, bd = 0;
         for (let d = -90; d <= 90; d += 5) { const x = boatSpeed(norm360(brg + d) - w.twd, w.tws), v = x.s * Math.cos(rad(d)); if (v > vmg) { vmg = v; bs = x; bd = d; } }
-        if (OPT.eng && vmg < OPT.engs && w.tws <= OPT.wmax) { vmg = OPT.engs; bs = { s: OPT.engs, m: true }; bd = 0; }
+        if (OPT.eng && vmg < OPT.engs && w.tws <= OPT.wmax && motOk(brg - w.twd, w.tws)) { vmg = OPT.engs; bs = { s: OPT.engs, m: true }; bd = 0; }
         const sog = Math.max(0.5, vmg), tack = !bs.m && Math.abs(bd) >= 5;
         legs.push({ lat: a.lat, lon: a.lon, h: t, hdg: tack ? norm360(brg + bd) : brg, hdg2: tack ? norm360(brg - bd) : null, tack, tws: w.tws, twd: w.twd, bsp: bs.s, mot: bs.m, wv: waveAt(a.lat, a.lon, t), cog: brg, sog, cu: null });
         t += distNm(a, b) / sog;
@@ -826,7 +828,7 @@
       const url = 'https://api.open-meteo.com/v1/forecast'
         + `?latitude=${c.map(p => p[0]).join(',')}`
         + `&longitude=${c.map(p => p[1]).join(',')}`
-        + `&hourly=wind_speed_10m,wind_direction_10m&wind_speed_unit=kn`
+        + `&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kn`
         + `&models=${modelId}&forecast_days=${days}&timezone=UTC&cell_selection=sea`;
       const j = await omJson(url);
       results[ci] = Array.isArray(j) ? j : [j];
@@ -842,25 +844,26 @@
     const t0 = Date.parse(tStr[0] + 'Z');
     const nx = lons.length, ny = lats.length;
     // Points à l'intérieur des terres non demandés : vent vide (comme la terre)
-    const empty = { hourly: { wind_speed_10m: [], wind_direction_10m: [] } };
+    const empty = { hourly: { wind_speed_10m: [], wind_direction_10m: [], wind_gusts_10m: [] } };
     const flat = pts.map(() => empty); keep.forEach((k, i) => { flat[k] = got[i]; });
     // Fin de prévision : on coupe aux dernières heures où la plupart des points ont du vent
     let nt = tStr.length;
     while (nt > 2 && got.filter(l => l.hourly.wind_speed_10m[nt - 1] != null).length < got.length * 0.5) nt--;
     if (!flat.some(l => l.hourly.wind_speed_10m.slice(0, nt).some(x => x != null))) throw new Error('Pas de vent pour cette zone avec ce modèle. Choisissez un autre modèle.');
-    const u = new Float32Array(nt * ny * nx), v = new Float32Array(nt * ny * nx);
+    const u = new Float32Array(nt * ny * nx), v = new Float32Array(nt * ny * nx), g = new Float32Array(nt * ny * nx);
     flat.forEach((loc, k) => {
       const iy = Math.floor(k / nx), ix = k % nx;
-      const S = loc.hourly.wind_speed_10m, D = loc.hourly.wind_direction_10m;
+      const S = loc.hourly.wind_speed_10m, D = loc.hourly.wind_direction_10m, G = loc.hourly.wind_gusts_10m || [];
       for (let t = 0; t < nt; t++) {
         const o = (t * ny + iy) * nx + ix;
+        g[o] = G[t] == null ? NaN : G[t];
         if (S[t] == null || D[t] == null) { u[o] = NaN; v[o] = NaN; continue; }
         const d = rad(D[t]);
         u[o] = -S[t] * Math.sin(d);
         v[o] = -S[t] * Math.cos(d);
       }
     });
-    return { lats, lons, step, t0, nt, nx, ny, u, v, bb, keep };
+    return { lats, lons, step, t0, nt, nx, ny, u, v, g, bb, keep };
   }
 
   // h = heures depuis wind.t0. Renvoie {tws, twd} ou null hors données.
@@ -872,7 +875,7 @@
     const x0 = Math.min(W.nx - 2, Math.floor(fx)), y0 = Math.min(W.ny - 2, Math.floor(fy));
     const ax = fx - x0, ay = fy - y0;
     const t0 = Math.min(W.nt - 2, Math.floor(h)), at = h - t0;
-    let U = 0, V = 0;
+    let U = 0, V = 0, Gs = 0, Gw = 0;
     for (let dt = 0; dt < 2; dt++) {
       const wt = dt ? at : 1 - at;
       if (wt === 0) continue;
@@ -883,9 +886,11 @@
         const uu = W.u[o], vv = W.v[o];
         if (Number.isNaN(uu)) return null;
         U += w * uu; V += w * vv;
+        if (W.g && !Number.isNaN(W.g[o])) { Gs += w * W.g[o]; Gw += w; }
       }
     }
-    return { tws: Math.hypot(U, V), twd: norm360(deg(Math.atan2(-U, -V))) };
+    const tws = Math.hypot(U, V);
+    return { tws, twd: norm360(deg(Math.atan2(-U, -V))), gu: Gw > 0.5 ? Math.max(tws, Gs / Gw) : null };
   }
 
   // ---------- Vagues Open-Meteo Marine (même grille que le vent) ----------
@@ -1019,7 +1024,7 @@
   function steer(brg, w, c, keepMot) {
     const spd = hd => {
       let bs = boatSpeed(hd - w.twd, w.tws);
-      if (keepMot && OPT.eng && !bs.m && bs.s < OPT.engs && w.tws <= OPT.wmax) bs = { s: OPT.engs, m: true };
+      if (keepMot && OPT.eng && !bs.m && bs.s < OPT.engs && w.tws <= OPT.wmax && motOk(hd - w.twd, w.tws)) bs = { s: OPT.engs, m: true };
       return bs;
     };
     if (!c) { const bs = spd(brg); return { hdg: brg, bs, sog: bs.s }; }
@@ -1965,8 +1970,20 @@
     if (h != null) curH = h;
     if (!wind || !map.getSource('wind')) return;
     const feats = [];
-    for (const [lo, la] of screenGrid(BIG() ? 110 : 90, 0)) {
-      const w = windAt(la, lo, curH);
+    const gap = BIG() ? 110 : 90, W = wind;
+    for (const [lo, la] of screenGrid(gap, 0)) {
+      // Vue large : une flèche couvre plusieurs points du modèle ; on montre le vent le plus fort de sa case
+      // (sinon un coup de vent local, mistral près de Marseille par exemple, passe entre deux flèches)
+      let w = windAt(la, lo, curH);
+      const q = map.project([lo, la]), A = map.unproject([q.x - gap / 2, q.y - gap / 2]), B2 = map.unproject([q.x + gap / 2, q.y + gap / 2]);
+      const i0 = Math.ceil((Math.min(A.lng, B2.lng) - W.lons[0]) / W.step), i1 = Math.floor((Math.max(A.lng, B2.lng) - W.lons[0]) / W.step);
+      const j0 = Math.ceil((Math.min(A.lat, B2.lat) - W.lats[0]) / W.step), j1 = Math.floor((Math.max(A.lat, B2.lat) - W.lats[0]) / W.step);
+      for (let j = Math.max(0, j0); j <= Math.min(W.ny - 1, j1); j++) for (let i = Math.max(0, i0); i <= Math.min(W.nx - 1, i1); i++) {
+        const nla = W.lats[0] + j * W.step, nlo = W.lons[0] + i * W.step;
+        if (isLand(nla, nlo)) continue;
+        const x = windAt(nla, nlo, curH);
+        if (x && (!w || x.tws > w.tws)) w = x;
+      }
       if (!w) continue;
       feats.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [lo, la] }, properties: { rot: norm360(w.twd), tws: w.tws, bb: Math.min(70, Math.round(w.tws / 5) * 5), label: nf0.format(w.tws) } });
     }
@@ -1987,7 +2004,7 @@
   function wxShow() {
     if (!wind) return;
     const h = Number(el('wx-range').value);
-    const t = wxFmt.format(new Date(wind.t0 + h * 3.6e6)); wxInfo(t.charAt(0).toUpperCase() + t.slice(1));
+    const t = wxFmt.format(new Date(wind.t0 + h * 3.6e6)); wxInfo(t.charAt(0).toUpperCase() + t.slice(1) + (h === Number(el('wx-range').min) ? ' · maintenant' : ''));
     drawWindMap(h); wavesKey = ''; drawWaves(h);
   }
   async function wxLoad() {
@@ -2006,7 +2023,7 @@
       wind = W; wxW = W; waves = null; currents = null; wxSpan = bb.e - bb.w;
       const r = el('wx-range'), hNow = Math.max(0, Math.min(W.nt - 1, Math.floor((Date.now() - W.t0) / 3.6e6)));
       r.min = hNow; r.max = W.nt - 1;
-      const tS = new Date(ui.tStart.value), want = keepH != null ? keepH : (Number.isNaN(+tS) ? Date.now() : +tS);
+      const tS = new Date(ui.tStart.value), want = keepH != null ? keepH : (Number.isNaN(+tS) || (!tStartSet && !last) ? Date.now() : +tS);
       r.value = Math.max(hNow, Math.min(W.nt - 1, Math.round((want - W.t0) / 3.6e6)));
       r.disabled = false; wxShow();
       // Vagues ensuite, sans bloquer le vent
@@ -2145,17 +2162,22 @@
   let tideZone = (document.cookie.split('; ').find(c => /^tiki_tidetz=(lieu|app|utc)$/.test(c)) || '=lieu').split('=')[1];
   const devTz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { return 'UTC'; } })();
   const offOf = (tz, t) => { const m = tzOff(tz, t).replace('−', '-').match(/UTC([+-])(\d+)(?::(\d+))?/); return m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] || 0)) * 60e3 : 0; };
+  el('tide-s').addEventListener('input', () => tideRender());
   function tideRender() {
     if (!tideData) return;
     const tz = tideZone === 'utc' ? 'UTC' : tideZone === 'app' ? devTz : tideData.tz;
     const off = offOf(tz, Date.now()), dz = Math.floor((Date.now() + off) / 86400e3) * 86400e3 - off;
-    const pts = tideData.all.filter(p => p[0] >= dz - 3600e3 && p[0] <= dz + 73 * 3600e3);
+    const base = Math.min(...tideData.all.map(p => p[1]));
+    const pts = tideData.all.filter(p => p[0] >= dz - 3600e3 && p[0] <= dz + 73 * 3600e3).map(p => [p[0], p[1] - base]);
     ['lieu', 'app', 'utc'].forEach(k => el('tz-' + k).setAttribute('aria-pressed', k === tideZone ? 'true' : 'false'));
     tideDraw(pts, dz, tz);
   }
   ['lieu', 'app', 'utc'].forEach(k => el('tz-' + k).addEventListener('click', () => {
     tideZone = k; try { document.cookie = `tiki_tidetz=${k}; Max-Age=31536000; Path=/; Secure; SameSite=Lax`; } catch (e) {} tideRender();
   }));
+  // Sonde lue sur la carte (facultative) : on affiche alors l'eau totale
+  const tideS = () => { const v = parseFloat(String(el('tide-s').value).replace(',', '.')); return Number.isFinite(v) && v >= 0 ? v : null; };
+  const tmfmt = v => { const S = tideS(); return S == null ? '+' + nf1.format(Math.max(0, v)) + ' m' : nf1.format(S + Math.max(0, v)) + ' m'; };
   function tideDraw(pts, d0, tz) {
     const fD = new Intl.DateTimeFormat('fr-CH', { timeZone: tz, weekday: 'short', day: 'numeric' });
     const fH = new Intl.DateTimeFormat('fr-CH', { timeZone: tz, weekday: 'short', hour: '2-digit', minute: '2-digit' });
@@ -2190,7 +2212,7 @@
     const st = hi - lo > 6 ? 2 : hi - lo > 3 ? 1 : hi - lo > 1.5 ? 0.5 : 0.2;
     for (let v = Math.ceil(lo / st) * st; v <= hi; v += st) {
       const y = Y(v); if (y < 12 || y > Hh - bot - 2) continue;
-      g += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" class="${Math.abs(v) < 1e-6 ? 'tg-zero' : 'tg-day'}"/><text x="3" y="${y - 3}" class="tg-ax">${mfmt(Math.round(v * 10) / 10)}</text>`;
+      g += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" class="${Math.abs(v) < 1e-6 ? 'tg-zero' : 'tg-day'}"/><text x="3" y="${y - 3}" class="tg-ax">${Math.abs(v) < 1e-6 ? (tideS() == null ? 'sonde' : 'sonde ' + nf1.format(tideS()) + ' m') : tmfmt(Math.round(v * 10) / 10)}</text>`;
     }
     const line = pts.map((p, i) => (i ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join('');
     g += `<path d="${line}L${X(pts[pts.length - 1][0]).toFixed(1)} ${Hh - bot}L${X(pts[0][0]).toFixed(1)} ${Hh - bot}Z" class="tg-fill"/><path d="${line}" class="tg-line"/>`;
@@ -2205,7 +2227,7 @@
     el('tide-tz-txt').innerHTML = `${tideZone === 'utc' ? '<b>Heures UTC</b>' : `${lbl} : <b>${tzOff(tz, N)}</b>`}${tideZone !== 'utc' && tzName(tz, N) ? ' (' + tzName(tz, N) + ')' : ''}${others.length ? ' · ' + [...new Set(others)].join(' · ') : ''}`;
     // les 4 prochaines pleines et basses mers à partir de maintenant
     const nx = ext.filter(e => e.t > now - 1800e3).slice(0, 4);
-    el('tide-ext').innerHTML = nx.map(e => `<span class="${e.hi ? 'pm' : 'bm'}"><b>${e.hi ? 'PM' : 'BM'}</b> ${fH.format(new Date(Math.round(e.t / 300e3) * 300e3))} <i>${mfmt(e.h)}</i></span>`).join('')
+        el('tide-ext').innerHTML = nx.map(e => `<span class="${e.hi ? 'pm' : 'bm'}"><b>${e.hi ? 'Haute' : 'Basse'}</b> ${fH.format(new Date(Math.round(e.t / 300e3) * 300e3))} <i>${tmfmt(e.h)}</i></span>`).join('')
       + `<span class="tide-key"><em class="k-now"></em>maintenant${dep > d0 && dep < t1 ? '<em class="k-dep"></em>départ' : ''}</span>`;
   }
   // curseur : heure et hauteur au doigt (interpolation entre les heures)
@@ -2216,7 +2238,7 @@
     const P = c.pts; let i = P.findIndex(p => p[0] >= t); if (i <= 0) i = 1; if (i < 0 || i >= P.length) return;
     const a = P[i - 1], b = P[i], h = a[1] + (b[1] - a[1]) * Math.max(0, Math.min(1, (t - a[0]) / (b[0] - a[0])));
     const g = el('tg-cur'); g.style.display = '';
-    const X = c.X(t), Yv = c.Y(h), txt = `${c.fH.format(new Date(t))} · ${mfmt(h)}`;
+    const X = c.X(t), Yv = c.Y(h), txt = `${c.fH.format(new Date(t))} · ${tideS() == null ? 'sonde ' : 'eau '}${tmfmt(h)}`;
     g.querySelector('line').setAttribute('x1', X); g.querySelector('line').setAttribute('x2', X);
     g.querySelector('circle').setAttribute('cx', X); g.querySelector('circle').setAttribute('cy', Yv);
     const tx = g.querySelector('text'); tx.textContent = txt;
@@ -2355,11 +2377,21 @@
   }
   const now = new Date(); now.setMinutes(0, 0, 0); now.setHours(now.getHours() + 1);
   ui.tStart.value = localInput(now);
+  // Heure de départ jamais touchée : on la garde à jour (appli laissée ouverte en arrière-plan)
+  let tStartSet = false;
+  ui.tStart.addEventListener('input', () => { tStartSet = true; });
+  el('r-tstart').addEventListener('input', () => { tStartSet = true; });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden || tStartSet || last) return;
+    const n = new Date(); n.setMinutes(0, 0, 0); n.setHours(n.getHours() + 1); ui.tStart.value = localInput(n);
+    if (wxOn) wxLoad();
+  });
 
   function say(t, err = false) { ui.msg.textContent = t; ui.msg.classList.toggle('err', err); }
 
   function clearResult() {
     last = null;
+    bestRun++; el('best-out').innerHTML = ''; el('r-gustw').hidden = true;
     panel.classList.remove('has-result');
     if (!wxOn) el('wave-toggle').hidden = true;
     if (handle.getAttribute('aria-expanded') === 'false') el('sheet-label').textContent = '\u25B2 Plus d\u2019options';
@@ -2609,6 +2641,95 @@
 
   el('cmp-go').addEventListener('click', runCompare);
 
+  // ---------- Meilleure heure de départ : on recalcule la route toutes les 3 h sur 2 jours ----------
+  let bestRun = 0;
+  async function runBest() {
+    if (!last) return;
+    const btn = el('best-go'), out = el('best-out'), keep = { wind, waves, currents }, t0v = ui.tStart.value, run = ++bestRun;
+    const n0 = new Date(); n0.setMinutes(0, 0, 0); n0.setHours(n0.getHours() + 1);
+    const deps = []; for (let k = 0; k <= 16; k++) deps.push(new Date(+n0 + k * 3 * 3.6e6));
+    btn.disabled = true; btn.setAttribute('aria-busy', 'true');
+    const rows = [];
+    try {
+      for (let k = 0; k < deps.length; k++) {
+        if (run !== bestRun) return;
+        out.innerHTML = `<p class="an-note">Calcul des départs\u2026 ${k + 1} / ${deps.length}</p>`;
+        ui.tStart.value = localInput(deps[k]);
+        try { const r = await computeRoute(model, true, () => {}); rows.push({ d: deps[k], st: routeStats(r) }); } catch (e) { rows.push({ d: deps[k], err: true }); }
+      }
+    } finally {
+      ui.tStart.value = t0v; wind = keep.wind; waves = keep.waves; currents = keep.currents;
+      btn.disabled = false; btn.removeAttribute('aria-busy');
+    }
+    const ok = rows.filter(q => !q.err);
+    if (!ok.length) { out.innerHTML = '<p class="cmp-err">Pas de route possible sur ces 2 jours avec ce modèle.</p>'; return; }
+    const tooMuch = q => q.st.twsMax > OPT.wmax || (q.st.guMax || 0) > OPT.wmax;
+    const pool = ok.filter(q => !tooMuch(q)).length ? ok.filter(q => !tooMuch(q)) : ok;
+    const best = pool.reduce((a, b) => (b.st.dur < a.st.dur - 1e-6 ? b : a));
+    out.innerHTML = `<p class="best-head">Le plus rapide : <b>départ ${dfmt.format(best.d)}</b>, ${fmtDur(best.st.dur)}${best.st.mot > 0.05 ? `, dont ${fmtDur(best.st.mot)} de moteur` : ''}. Touchez un départ pour le calculer.</p>`
+      + '<div class="best-list">' + rows.map((q, i) => q.err
+        ? `<div class="best-row off"><b>${dfmt.format(q.d)}</b><span>pas de route</span></div>`
+        : `<button type="button" class="best-row${q === best ? ' win' : ''}${tooMuch(q) ? ' bad' : ''}" data-i="${i}"><b>${dfmt.format(q.d)}</b><span>${fmtDur(q.st.dur)}${q.st.mot > 0.05 ? ` · moteur ${fmtDur(q.st.mot)}` : ''}</span><span>vent ${nf0.format(q.st.twsMax)}${q.st.guMax ? ` · rafales ${nf0.format(q.st.guMax)}` : ''} nds${tooMuch(q) ? ' · trop de vent' : ''}</span></button>`).join('') + '</div>';
+    out.querySelectorAll('.best-row[data-i]').forEach(b => b.addEventListener('click', () => {
+      ui.tStart.value = localInput(rows[+b.dataset.i].d); tStartSet = true; if (wxOn) wxClose(true); runMain();
+    }));
+  }
+  el('best-go').addEventListener('click', runBest);
+
+  // ---------- Ma position (GPS du téléphone) : point bleu, départ, écart à la route ----------
+  let gpsId = null, gpsMk = null, gpsFirst = false, gpsPos = null;
+  function gpsEl() { const d = document.createElement('div'); d.className = 'gps-dot'; return d; }
+  function gpsChip(t, err) { const c = el('gps-chip'); c.hidden = !t; c.innerHTML = t || ''; c.classList.toggle('err', !!err); }
+  function gpsTrack() {
+    if (!gpsPos) return;
+    const p = gpsPos, kn = p.spd != null ? ` · ${nf1.format(p.spd)} nds` : '';
+    if (!last || !last.legs || last.legs.length < 2) { gpsChip(`<b>Vous êtes ici</b>${kn}${p.acc > 100 ? ` · précision ${Math.round(p.acc)} m` : ''}`); return; }
+    // point le plus proche sur la route (projection locale)
+    const L = last.legs, cl = Math.cos(rad(p.lat));
+    let best = { d: 1e9, i: 0, t: 0 };
+    for (let i = 0; i < L.length - 1; i++) {
+      const ax = (L[i].lon - p.lon) * cl, ay = L[i].lat - p.lat, bx = (L[i + 1].lon - p.lon) * cl, by = L[i + 1].lat - p.lat;
+      const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / l2)) : 0;
+      const d = Math.hypot(ax + t * dx, ay + t * dy);
+      if (d < best.d) best = { d, i, t };
+    }
+    const A = L[best.i], B = L[best.i + 1], q = { lat: A.lat + (B.lat - A.lat) * best.t, lon: A.lon + (B.lon - A.lon) * best.t };
+    const off = distNm(p, q), brg = bearing(A, B);
+    // cap conseillé : vers un point de la route 1 M plus loin
+    let rest = 1, cur = q, j = best.i + 1, aim = L[L.length - 1];
+    while (j < L.length) { const dd = distNm(cur, L[j]); if (dd >= rest) { const f = rest / dd; aim = { lat: cur.lat + (L[j].lat - cur.lat) * f, lon: cur.lon + (L[j].lon - cur.lon) * f }; break; } rest -= dd; cur = L[j]; j++; }
+    const side = norm180(bearing(q, p) - brg) > 0 ? 'tribord' : 'bâbord';
+    const toEnd = distNm(p, L[L.length - 1]);
+    gpsChip(`<b>Écart ${off < 0.05 ? 'nul' : `${distTxt(off)} à ${side}`}</b> de la route · cap ${nf0.format(bearing(p, aim))}°${kn}<br><small>Arrivée à ${distTxt(toEnd)}</small>`);
+  }
+  function gpsStop() {
+    if (gpsId != null) navigator.geolocation.clearWatch(gpsId);
+    gpsId = null; gpsPos = null; if (gpsMk) { gpsMk.remove(); gpsMk = null; }
+    gpsChip(''); el('gps-btn').setAttribute('aria-pressed', 'false');
+  }
+  el('gps-btn').addEventListener('click', () => {
+    if (gpsId != null) { gpsStop(); return; }
+    if (!navigator.geolocation) { gpsChip('Pas de GPS sur cet appareil.', true); return; }
+    el('gps-btn').setAttribute('aria-pressed', 'true'); gpsFirst = true; gpsChip('Recherche de votre position\u2026');
+    gpsId = navigator.geolocation.watchPosition(g => {
+      const c = g.coords;
+      gpsPos = { lat: c.latitude, lon: c.longitude, acc: c.accuracy, spd: c.speed != null && c.speed >= 0 ? c.speed * 1.94384 : null };
+      const ll = [gpsPos.lon, gpsPos.lat];
+      if (!gpsMk) gpsMk = new maplibregl.Marker({ element: gpsEl() }).setLngLat(ll).addTo(map); else gpsMk.setLngLat(ll);
+      if (gpsFirst) {
+        gpsFirst = false;
+        map.flyTo({ center: ll, zoom: Math.max(map.getZoom(), 11), duration: 800 });
+        if (!start && !last && !wxOn && !tideOn) { setPoint('start', { lat: gpsPos.lat, lng: gpsPos.lon }); say('Départ placé sur votre position. Touchez la carte pour l\u2019arrivée.'); }
+      }
+      gpsTrack();
+    }, e => {
+      gpsStop();
+      gpsChip(e.code === 1 ? 'Position refusée : autorisez la localisation pour Routage dans le téléphone.' : 'Position introuvable. Réessayez à l\u2019extérieur.', true);
+      setTimeout(() => { if (gpsId == null) gpsChip(''); }, 6000);
+    }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+  });
+
   function timeAt(h) { return new Date(wind.t0 + h * 3.6e6); }
 
   // ---------- Simplification des points (Douglas-Peucker, sans couper la terre) ----------
@@ -2770,6 +2891,13 @@
     ui.eta.textContent = hfmt.format(timeAt(r.h0 + r.dur));
     ui.dist.textContent = distTxt(r.dist);
     ui.wmax.textContent = `${nf0.format(wmax)} nds`;
+    // Rafales le long de la route (données du modèle météo)
+    let guMax = 0, guH = null;
+    r.legs.forEach(n => { if (n.wait) return; const w = windAt(n.lat, n.lon, n.h); n.gu = w && w.gu != null ? w.gu : -1; if (n.gu > guMax) { guMax = n.gu; guH = n.h; } });
+    el('r-gust').textContent = guMax > 0 ? `rafales ${nf0.format(guMax)}` : '';
+    const rg = el('r-gustw');
+    rg.hidden = !(guMax > OPT.wmax);
+    if (guMax > OPT.wmax) rg.innerHTML = `<b>Rafales jusqu'à ${nf0.format(guMax)} nds</b> ${dfmt.format(timeAt(guH))}, au-dessus de votre vent max (${nf0.format(OPT.wmax)} nds).`;
     const hsArr = r.legs.filter(n => n.wv).map(n => n.wv.hs);
     el('r-wave').textContent = hsArr.length ? `${nf1.format(Math.max(...hsArr))} m` : 'n. d.';
     let motH = 0, waitH = 0;
@@ -2794,6 +2922,7 @@
     try { r.sails = showSailPlan(r); } catch (e) { console.error(e); }
     r.statsA = routeStats(r);
     clearCompare(); fillCompareSelect();
+    if (typeof gpsTrack === 'function') gpsTrack();
 
     ui.scrub.min = '0'; ui.scrub.max = '1000'; ui.scrub.value = '0';
     if (!boat) boat = new maplibregl.Marker({ element: boatEl(), rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat(coords[0]).addTo(map);
@@ -2901,20 +3030,22 @@
   // ---------- Comparer deux modèles ----------
   // Chiffres clés d'une route, calculés pendant que wind/waves sont ceux de son modèle.
   function routeStats(r) {
-    const L = r.legs; let mot = 0, wait = 0, night = 0, twsMax = 0, hsMax = 0;
+    const L = r.legs; let mot = 0, wait = 0, night = 0, twsMax = 0, hsMax = 0, guMax = 0, guH = null;
     const allure = { 'près': 0, travers: 0, largue: 0, 'vent arrière': 0 };
     for (let i = 0; i < L.length - 1; i++) {
       const a = L[i], dt = L[i + 1].h - a.h; if (dt <= 0) continue;
       if (!sunUp(a.lat, a.lon, timeAt(a.h + dt / 2))) night += dt;
       if (a.wait) { wait += dt; continue; }
       if (a.tws != null) twsMax = Math.max(twsMax, a.tws);
+      if (a.gu == null && wind) { const w = windAt(a.lat, a.lon, a.h); a.gu = w && w.gu != null ? w.gu : -1; }
+      if (a.gu > guMax) { guMax = a.gu; guH = a.h; }
       if (a.wv) hsMax = Math.max(hsMax, a.wv.hs);
       if (a.mot) { mot += dt; continue; }
       const twa = Math.abs(norm180(a.twd - a.hdg));
       allure[twa < 60 ? 'près' : twa < 110 ? 'travers' : twa < 150 ? 'largue' : 'vent arrière'] += dt;
     }
     const dom = Object.keys(allure).sort((x, y) => allure[y] - allure[x])[0];
-    return { model: r.model, modelId: r.modelId, wName: r.noWaves ? null : r.wName, dur: r.dur, dist: r.dist, arr: timeAt(r.h0 + r.dur), twsMax, hsMax: r.noWaves ? null : hsMax, mot, wait, night, dom,
+    return { model: r.model, modelId: r.modelId, wName: r.noWaves ? null : r.wName, dur: r.dur, dist: r.dist, arr: timeAt(r.h0 + r.dur), twsMax, guMax: guMax > 0 ? guMax : null, guH, hsMax: r.noWaves ? null : hsMax, mot, wait, night, dom,
       pts: L.map(n => ({ lat: n.lat, lon: n.lon })) };
   }
   let cmp = null;
@@ -3151,7 +3282,7 @@
       const twa = Math.abs(norm180(a.twd - a.hdg));
       set('now-hdg', a.tack && a.hdg2 != null ? `${nf0.format(a.hdg)}° / ${nf0.format(a.hdg2)}° en tirant des bords` : `${nf0.format(a.hdg)}°`);
       set('now-bsp', `${nf1.format(a.bsp)} nds${a.mot ? ' moteur' : ''}${r.useCur && a.sog != null && Math.abs(a.sog - a.bsp) >= 0.05 ? ` · fond ${nf1.format(a.sog)}` : ''}`);
-      set('now-tws', `${nf0.format(a.tws)} nds du ${nf0.format(a.twd)}°`);
+      set('now-tws', `${nf0.format(a.tws)} nds du ${nf0.format(a.twd)}°${a.gu > 0 ? ` · rafales ${nf0.format(a.gu)}` : ''}`);
       set('now-twa', a.mot ? 'Moteur' : `${nf0.format(twa)}° ${side(a.hdg, a.twd)}${a.tack ? ' · louvoyage serré dans le passage étroit, moteur conseillé' : ''}`);
       const sv = a.mot ? null : sailFor(twa, a.tws);
       set('now-sail', a.mot ? 'Moteur' : sv ? sailTxt(sv) : '–');
@@ -3178,7 +3309,7 @@
   el('next').addEventListener('click', () => stepLeg(1));
 
   // Réglages : lecture, mémoire locale, résumé
-  const optIds = { hmax: 'o-hmax', pol: 'o-pol', wmax: 'o-wmax', cx: 'o-cx', coast: 'o-coast', dmin: 'o-dmin', eng: 'o-eng', min: 'o-min', engs: 'o-engs' };
+  const optIds = { hmax: 'o-hmax', pol: 'o-pol', wmax: 'o-wmax', cx: 'o-cx', coast: 'o-coast', dmin: 'o-dmin', eng: 'o-eng', min: 'o-min', engs: 'o-engs', engw: 'o-engw' };
   function readOpt() {
     const num = (id, d, lo, hi) => { const v = parseFloat(String(el(id).value).replace(',', '.')); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
     OPT.pol = num('o-pol', 100, 40, 110) / 100;
@@ -3189,6 +3320,7 @@
     OPT.eng = el('o-eng').checked;
     OPT.min = num('o-min', 3, 0.5, 10);
     OPT.engs = num('o-engs', 5, 1, 12);
+    OPT.engw = num('o-engw', 15, 0, 60);
     OPT.hmax = num('o-hmax', 4, 0.5, 12);
     ['cp', 'ct', 'cd', 'cl'].forEach(k => { OPT[k] = num('o-' + k, 100, 50, 130) / 100; el('v-' + k).textContent = `${Math.round(OPT[k] * 100)} %`; });
     OPT.pk = el('o-pk').dataset.v === 'l' ? 'l' : el('o-pk').dataset.v === 'x' && POLARS.x ? 'x' : 'c';
@@ -3233,6 +3365,7 @@
     if (o.eng != null) el('o-eng').checked = !!o.eng;
     if (o.min != null) el('o-min').value = o.min;
     if (o.engs != null) el('o-engs').value = o.engs;
+    if (o.engw != null) el('o-engw').value = o.engw;
     if (o.hmax != null && Number.isFinite(+o.hmax)) el('o-hmax').value = o.hmax;
     ['cp', 'ct', 'cd', 'cl'].forEach(k => { if (o[k] != null && Number.isFinite(+o[k])) el('o-' + k).value = Math.round(o[k] * 100); });
     if (o.pk) el('o-pk').dataset.v = o.pk === 'l' ? 'l' : o.pk === 'x' && POLARS.x ? 'x' : 'c';
@@ -3244,7 +3377,7 @@
     try {
       const q = new URLSearchParams(location.search);
       if (q.has('pol') || q.has('wmax')) {
-        const o = { pol: +q.get('pol') / 100 || 1, wmax: +q.get('wmax') || 35, eng: q.get('eng') === '1', min: +q.get('min') || 3, engs: +q.get('engs') || 5, pk: q.get('pk') === 'l' ? 'l' : q.get('pk') === 'x' ? 'x' : 'c' };
+        const o = { pol: +q.get('pol') / 100 || 1, wmax: +q.get('wmax') || 35, eng: q.get('eng') === '1', min: +q.get('min') || 3, engs: +q.get('engs') || 5, engw: q.has('mfv') ? +q.get('mfv') : 15, pk: q.get('pk') === 'l' ? 'l' : q.get('pk') === 'x' ? 'x' : 'c' };
         ['cp', 'ct', 'cd', 'cl'].forEach(k => { if (q.has(k)) o[k] = +q.get(k) / 100 || 1; });
         if (q.has('hmax')) o.hmax = +q.get('hmax') || 4;
         if (q.has('cx')) o.cx = +q.get('cx') || 20;
@@ -3265,7 +3398,7 @@
     try { document.cookie = `${CK}=${v}; Max-Age=31536000; Path=/; Secure; SameSite=Lax`; } catch (e) {}
     try {
       const q = new URLSearchParams(location.search);
-      q.set('pol', Math.round(OPT.pol * 100)); q.set('wmax', OPT.wmax); q.set('eng', OPT.eng ? '1' : '0'); q.set('min', OPT.min); q.set('engs', OPT.engs); q.set('pk', OPT.pk); q.set('hmax', OPT.hmax); q.set('cx', OPT.cx); q.set('cote', OPT.coast); q.set('prof', OPT.dmin); q.set('spi', OPT.spi ? '1' : '0'); q.set('cur', OPT.cur ? '1' : '0'); q.set('ico', OPT.ico);
+      q.set('pol', Math.round(OPT.pol * 100)); q.set('wmax', OPT.wmax); q.set('eng', OPT.eng ? '1' : '0'); q.set('min', OPT.min); q.set('engs', OPT.engs); q.set('mfv', OPT.engw); q.set('pk', OPT.pk); q.set('hmax', OPT.hmax); q.set('cx', OPT.cx); q.set('cote', OPT.coast); q.set('prof', OPT.dmin); q.set('spi', OPT.spi ? '1' : '0'); q.set('cur', OPT.cur ? '1' : '0'); q.set('ico', OPT.ico);
       ['cp', 'ct', 'cd', 'cl'].forEach(k => q.set(k, Math.round(OPT[k] * 100)));
       history.replaceState(null, '', `${location.pathname}?${q}`);
     } catch (e) {}
