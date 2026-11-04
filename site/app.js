@@ -2144,12 +2144,14 @@
       if (seq !== tideSeq || !tideOn) return;
       // fuseau du lieu (donné par Open-Meteo) ; minuit du jour dans ce fuseau
       let tz = j.timezone || 'UTC'; try { new Intl.DateTimeFormat('fr-CH', { timeZone: tz }); } catch (e) { tz = 'UTC'; }
+      // En pleine mer, Open-Meteo répond « GMT » (pas de fuseau) : on prend l'heure de l'appareil
+      const atSea = /^(GMT|UTC|Etc\/)/.test(tz); if (atSea) tz = devTz;
       const off = (j.utc_offset_seconds || 0) * 1000;
       const T = (j.hourly && j.hourly.time) || [], H = (j.hourly && j.hourly.sea_level_height_msl) || [];
       const all = [];
       T.forEach((t, i) => { if (H[i] != null) all.push([t * 1000, H[i]]); });
       if (all.length < 48) { el('tide-ttl').textContent = 'Pas de données de marée à cet endroit'; el('tide-body').hidden = true; return; }
-      tideData = { all, tz };
+      tideData = { all, tz, atSea };
       el('tide-ttl').innerHTML = 'Marée · ' + fmtPos({ lat: ll.lat, lon: ll.lng });
       tideRender();
       el('tide-body').hidden = false;
@@ -2212,6 +2214,7 @@
     const st = hi - lo > 6 ? 2 : hi - lo > 3 ? 1 : hi - lo > 1.5 ? 0.5 : 0.2;
     for (let v = Math.ceil(lo / st) * st; v <= hi; v += st) {
       const y = Y(v); if (y < 12 || y > Hh - bot - 2) continue;
+      if (v < -1e-6) continue; // sous la sonde : pas de graduation
       g += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" class="${Math.abs(v) < 1e-6 ? 'tg-zero' : 'tg-day'}"/><text x="3" y="${y - 3}" class="tg-ax">${Math.abs(v) < 1e-6 ? (tideS() == null ? 'sonde' : 'sonde ' + nf1.format(tideS()) + ' m') : tmfmt(Math.round(v * 10) / 10)}</text>`;
     }
     const line = pts.map((p, i) => (i ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join('');
@@ -2222,7 +2225,7 @@
     g += '<g id="tg-cur" style="display:none"><line class="tg-curl" y1="0" y2="' + (Hh - bot) + '"/><circle class="tg-curc" r="5"/><text class="tg-curt" y="13"></text></g>';
     el('tide-svg').innerHTML = g;
     tideCur = { pts, d0, t1, X, Y, W, fH };
-    const N = Date.now(), pl = tideData.tz, lbl = { lieu: 'Heures du lieu', app: 'Heures de votre appareil', utc: 'Heures UTC' }[tideZone];
+    const N = Date.now(), pl = tideData.tz, lbl = { lieu: tideData.atSea ? 'En mer, heures de votre appareil' : 'Heures du lieu', app: 'Heures de votre appareil', utc: 'Heures UTC' }[tideZone];
     const others = [['lieu', 'lieu', pl], ['app', 'appareil', devTz]].filter(([k, , z]) => k !== tideZone && tzOff(z, N) !== tzOff(tz, N)).map(([, n, z]) => `${n} : ${tzOff(z, N)}`);
     el('tide-tz-txt').innerHTML = `${tideZone === 'utc' ? '<b>Heures UTC</b>' : `${lbl} : <b>${tzOff(tz, N)}</b>`}${tideZone !== 'utc' && tzName(tz, N) ? ' (' + tzName(tz, N) + ')' : ''}${others.length ? ' · ' + [...new Set(others)].join(' · ') : ''}`;
     // les 4 prochaines pleines et basses mers à partir de maintenant
