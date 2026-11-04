@@ -1072,7 +1072,7 @@
 
     for (let k = 0; k < maxSteps; k++) {
       const h = h0 + k * dt;
-      const next = new Map();
+      const next = new Map(); const land0 = rej.land, wave0 = rej.wave;
       for (const p of frontier) {
         const w = windAt(p.lat, p.lon, h);
         if (!w) { horizon = true; continue; }
@@ -1108,6 +1108,8 @@
         }
       }
       if (best) break;
+      // Calme plat partout : on attend sur place le retour du vent au lieu d'abandonner
+      if (!next.size && frontier.length && rej.land === land0 && rej.wave === wave0) { rej.calm = (rej.calm || 0) + 1; frontier = frontier.map(p => ({ ...p, h: h + dt })); continue; }
       frontier = [...next.values()];
       if (wave) for (const p of frontier) seen.add(p.c);
       if (!frontier.length) break;
@@ -2582,6 +2584,7 @@
       }
       const segTxt = r.error && P.length > 2 ? `Tronçon ${r.seg + 1} (${r.seg === 0 ? 'départ' : 'point ' + r.seg} \u2192 ${r.seg === P.length - 2 ? 'arrivée' : 'point ' + (r.seg + 1)}) : ` : '';
       drawIsos(r.error ? r.isos : []);
+      if (r.error === 'horizon' && r.rej && r.rej.calm > 6) throw new Error(segTxt + 'Pas de route : pas assez de vent sur le trajet (calme). Autorisez le moteur (Réglages bateau) ou changez l\u2019heure de départ.');
       if (r.error === 'horizon') {
         const end = dfmt.format(new Date(wind.t0 + (wind.nt - 1) * 3.6e6));
         throw new Error(segTxt + (M.fine
@@ -2604,7 +2607,8 @@
         }
       }
       if (r.error === 'stuck') throw new Error(segTxt + 'La route ne progresse plus : côte, pas assez de vent, ou vent ou vagues au-dessus de vos maximums. Déplacez un point plus au large, montez le vent max ou les vagues max, ou autorisez le moteur.');
-      if (r.error) throw new Error(segTxt + 'Pas de route trouvée : terre, vent trop faible, ou vent ou vagues au-dessus de vos maximums.');
+      if (r.error && r.rej && r.rej.land > 0) throw new Error(segTxt + 'Pas de route trouvée : la terre bloque le passage. Placez le départ et l\u2019arrivée bien en mer, ou ajoutez un point de passage.');
+      if (r.error) throw new Error(segTxt + 'Pas de route trouvée : pas assez de vent sur le trajet. Autorisez le moteur (Réglages bateau) ou changez l\u2019heure de départ.');
 
       return { ...r, h0, tStart, model: mName, modelId: model, wName, snapped: S0.some(x => x.moved > 0.05), coastCut: coastCut || !fineOn, hazCut, dmin: OPT.dmin, coastM: OPT.coast, noWaves: !waves, wind, waves, currents, useCur: !!(OPT.cur && currents) };
   }
