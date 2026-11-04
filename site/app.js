@@ -2391,7 +2391,7 @@
 
   function clearResult() {
     last = null;
-    bestRun++; el('best-out').innerHTML = ''; el('r-gustw').hidden = true;
+    bestRun++; el('best-out').innerHTML = ''; el('r-gustw').hidden = true; el('r-night').hidden = true;
     panel.classList.remove('has-result');
     if (!wxOn) el('wave-toggle').hidden = true;
     if (handle.getAttribute('aria-expanded') === 'false') el('sheet-label').textContent = '\u25B2 Plus d\u2019options';
@@ -2666,15 +2666,36 @@
     const tooMuch = q => q.st.twsMax > OPT.wmax || (q.st.guMax || 0) > OPT.wmax;
     const pool = ok.filter(q => !tooMuch(q)).length ? ok.filter(q => !tooMuch(q)) : ok;
     const best = pool.reduce((a, b) => (b.st.dur < a.st.dur - 1e-6 ? b : a));
-    out.innerHTML = `<p class="best-head">Le plus rapide : <b>départ ${dfmt.format(best.d)}</b>, ${fmtDur(best.st.dur)}${best.st.mot > 0.05 ? `, dont ${fmtDur(best.st.mot)} de moteur` : ''}. Touchez un départ pour le calculer.</p>`
+    const dayPool = pool.filter(q => !q.st.nightArr), dayBest = dayPool.length ? dayPool.reduce((a, b) => (b.st.dur < a.st.dur - 1e-6 ? b : a)) : null;
+    out.innerHTML = `<p class="best-head">Le plus rapide : <b>départ ${dfmt.format(best.d)}</b>, ${fmtDur(best.st.dur)}${best.st.mot > 0.05 ? `, dont ${fmtDur(best.st.mot)} de moteur` : ''}. ${best.st.nightArr && dayBest ? `Arrivée de jour : <b>départ ${dfmt.format(dayBest.d)}</b>, ${fmtDur(dayBest.st.dur)}.` : ''} Touchez un départ pour le calculer.</p>`
       + '<div class="best-list">' + rows.map((q, i) => q.err
         ? `<div class="best-row off"><b>${dfmt.format(q.d)}</b><span>pas de route</span></div>`
-        : `<button type="button" class="best-row${q === best ? ' win' : ''}${tooMuch(q) ? ' bad' : ''}" data-i="${i}"><b>${dfmt.format(q.d)}</b><span>${fmtDur(q.st.dur)}${q.st.mot > 0.05 ? ` · moteur ${fmtDur(q.st.mot)}` : ''}</span><span>vent ${nf0.format(q.st.twsMax)}${q.st.guMax ? ` · rafales ${nf0.format(q.st.guMax)}` : ''} nds${tooMuch(q) ? ' · trop de vent' : ''}</span></button>`).join('') + '</div>';
+        : `<button type="button" class="best-row${q === best ? ' win' : ''}${q === dayBest && q !== best ? ' day' : ''}${tooMuch(q) ? ' bad' : ''}" data-i="${i}"><b>${dfmt.format(q.d)}</b><span>${fmtDur(q.st.dur)}${q.st.mot > 0.05 ? ` · moteur ${fmtDur(q.st.mot)}` : ''}</span><span>vent ${nf0.format(q.st.twsMax)}${q.st.guMax ? ` · rafales ${nf0.format(q.st.guMax)}` : ''} nds${tooMuch(q) ? ' · trop de vent' : ''}${q.st.nightArr ? ' · arrivée de nuit' : ''}</span></button>`).join('') + '</div>';
     out.querySelectorAll('.best-row[data-i]').forEach(b => b.addEventListener('click', () => {
       ui.tStart.value = localInput(rows[+b.dataset.i].d); tStartSet = true; if (wxOn) wxClose(true); runMain();
     }));
   }
   el('best-go').addEventListener('click', runBest);
+
+  // ---------- Arrivée de nuit : on le dit et on propose un départ pour arriver de jour ----------
+  function nightNote(r) {
+    const box = el('r-night'), E = r.legs[r.legs.length - 1], arr = +timeAt(r.h0 + r.dur), dep = +timeAt(r.h0);
+    if (sunUp(E.lat, E.lon, new Date(arr))) { box.hidden = true; return; }
+    const st = 10 * 60e3; let tSet = arr, tRise = arr;
+    for (let k = 0; k < 120 && !sunUp(E.lat, E.lon, new Date(tSet - st)); k++) tSet -= st;
+    for (let k = 0; k < 120 && !sunUp(E.lat, E.lon, new Date(tRise)); k++) tRise += st;
+    const n0 = new Date(); n0.setMinutes(0, 0, 0); n0.setHours(n0.getHours() + 1);
+    const hr = t => { const d = new Date(t); d.setMinutes(0, 0, 0); return d; };
+    const early = hr(dep - (arr - tSet) - 60 * 60e3), late = hr(dep + (tRise - arr) + 90 * 60e3);
+    const bt = [];
+    if (+early >= +n0) bt.push(`<button type="button" class="night-btn" data-t="${+early}">Partir plus tôt : ${dfmt.format(early)}</button>`);
+    bt.push(`<button type="button" class="night-btn" data-t="${+late}">Partir plus tard : ${dfmt.format(late)}</button>`);
+    box.innerHTML = `<b>Arrivée de nuit</b> (${hfmt.format(new Date(arr))}, coucher du soleil ${hfmt.format(new Date(tSet))}, lever ${hfmt.format(new Date(tRise))}). Pour arriver de jour :<span class="night-bts">${bt.join('')}</span>`;
+    box.hidden = false;
+    box.querySelectorAll('.night-btn').forEach(b => b.addEventListener('click', () => {
+      ui.tStart.value = localInput(new Date(+b.dataset.t)); tStartSet = true; runMain();
+    }));
+  }
 
   // ---------- Ma position (GPS du téléphone) : point bleu, départ, écart à la route ----------
   let gpsId = null, gpsMk = null, gpsFirst = false, gpsPos = null;
@@ -2922,6 +2943,7 @@
     try { r.sails = showSailPlan(r); } catch (e) { console.error(e); }
     r.statsA = routeStats(r);
     clearCompare(); fillCompareSelect();
+    nightNote(r);
     if (typeof gpsTrack === 'function') gpsTrack();
 
     ui.scrub.min = '0'; ui.scrub.max = '1000'; ui.scrub.value = '0';
@@ -3045,7 +3067,7 @@
       allure[twa < 60 ? 'près' : twa < 110 ? 'travers' : twa < 150 ? 'largue' : 'vent arrière'] += dt;
     }
     const dom = Object.keys(allure).sort((x, y) => allure[y] - allure[x])[0];
-    return { model: r.model, modelId: r.modelId, wName: r.noWaves ? null : r.wName, dur: r.dur, dist: r.dist, arr: timeAt(r.h0 + r.dur), twsMax, guMax: guMax > 0 ? guMax : null, guH, hsMax: r.noWaves ? null : hsMax, mot, wait, night, dom,
+    return { model: r.model, modelId: r.modelId, wName: r.noWaves ? null : r.wName, dur: r.dur, dist: r.dist, arr: timeAt(r.h0 + r.dur), twsMax, nightArr: !sunUp(L[L.length - 1].lat, L[L.length - 1].lon, timeAt(r.h0 + r.dur)), guMax: guMax > 0 ? guMax : null, guH, hsMax: r.noWaves ? null : hsMax, mot, wait, night, dom,
       pts: L.map(n => ({ lat: n.lat, lon: n.lon })) };
   }
   let cmp = null;
