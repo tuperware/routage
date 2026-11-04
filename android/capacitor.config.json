@@ -1,0 +1,7 @@
+{
+  "appId": "app.tiki38.routage",
+  "appName": "Routage",
+  "webDir": "www",
+  "server": { "url": "https://routage.pplx.app/", "androidScheme": "https", "allowNavigation": ["routage.pplx.app"] },
+  "android": { "allowMixedContent": false }
+}
