@@ -1802,7 +1802,10 @@
     map.addSource('fin', { type: 'raster', tileSize: 256, minzoom: 5, maxzoom: 17, bounds: [19, 59.3, 31, 66.5],
       tiles: ['https://julkinen.traficom.fi/rasteripalvelu/wmts/rest/Traficom:Merikarttasarja%20A%20public/default/WGS84_Pseudo-Mercator/WGS84_Pseudo-Mercator:{z}/{y}/{x}?format=image/png'],
       attribution: 'Merikartta © <a href="https://www.traficom.fi" target="_blank">Traficom</a> CC BY 4.0' });
-    ['noaa', 'bra', 'nor', 'fin'].forEach(id => map.addLayer({ id, type: 'raster', source: id, layout: { visibility: 'none' } }));
+    map.addSource('isl', { type: 'raster', tileSize: 256, minzoom: 5, maxzoom: 17, bounds: [-25.5, 62.8, -12.5, 67.6],
+      tiles: ['https://gis.lmi.is/mapcache/sjokort/wms?service=WMS&version=1.1.1&request=GetMap&layers=Sjomaelingar:Sjokort_Sjomaelinga&styles=&srs=EPSG:3857&bbox={bbox-epsg-3857}&width=256&height=256&format=image/png'],
+      attribution: 'Sjókort © <a href="https://www.lhg.is" target="_blank">Landhelgisgæsla Íslands</a>, <a href="https://www.lmi.is" target="_blank">LMÍ</a>' });
+    ['noaa', 'bra', 'nor', 'fin', 'isl'].forEach(id => map.addLayer({ id, type: 'raster', source: id, layout: { visibility: 'none' } }));
     map.addLayer({ id: 'emod', type: 'raster', source: 'emod', layout: { visibility: chartOn ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.9 } });
     map.addLayer({ id: 'seamark', type: 'raster', source: 'seamark', layout: { visibility: chartOn ? 'visible' : 'none' } });
     map.addSource('wind', { type: 'geojson', data: EMPTY });
@@ -2336,7 +2339,7 @@
   el('ruler-close').addEventListener('click', () => rulerSet(false));
   // Bouton Carte marine : mémorisé dans un cookie
   // Choix de la carte (Balises ou SHOM) mémorisé dans un cookie ; la carte reste éteinte à l'ouverture
-  let chartSrc = (document.cookie.split('; ').find(c => /^tiki_chartsrc=(shom|sea|osm|ihm|noaa|bra|nor|fin|auto)$/.test(c)) || '=auto').split('=')[1];
+  let chartSrc = (document.cookie.split('; ').find(c => /^tiki_chartsrc=(shom|sea|osm|ihm|noaa|bra|nor|fin|isl|auto)$/.test(c)) || '=auto').split('=')[1];
   // Choix automatique selon le centre de l'écran : SHOM en France, IHM en Espagne, Balises ailleurs
   const inB = (la, lo, a, b, c, d) => la >= a && la <= b && lo >= c && lo <= d;
   function autoSrc() {
@@ -2345,6 +2348,7 @@
     const es = inB(la, lo, 35.95, 42.43, -5.65, 4.6) || inB(la, lo, 41.85, 43.9, -9.9, -1.78) || inB(la, lo, 36, 37.4, -7.4, -5.65) || inB(la, lo, 27.4, 29.6, -18.4, -13.2);
     if (es) return 'ihm';
     if (inB(la, lo, 24, 49.5, -125, -66.5) || inB(la, lo, 51, 72, -180, -129) || inB(la, lo, 18.5, 23, -161, -154) || inB(la, lo, 17.5, 18.8, -68, -64.3) || inB(la, lo, 13, 15.5, 144.5, 146)) return 'noaa';
+    if (inB(la, lo, 62.8, 67.6, -25.5, -12.5)) return 'isl';
     if (inB(la, lo, -34, 5.5, -54, -28) && !(la < -30 && lo < -53)) return 'bra';
     if (inB(la, lo, 57.8, 72, 4, 31.5) && !(la < 59.2 && lo > 11.4) && !(lo > 12.5 + (la - 59.2) * 0.6 && la < 68.5)) return 'nor';
     if ((inB(la, lo, 59.6, 61, 19.3, 30.5) && !(la < 59.75 && lo > 22.5)) || inB(la, lo, 61, 66, 21, 25.7)) return 'fin';
@@ -2359,7 +2363,7 @@
     el('chart-btn').setAttribute('aria-pressed', on ? 'true' : 'false');
     el('chart-legend').hidden = !on;
     const vis = (id, v) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none');
-    vis('shom', on && chartSrc === 'shom'); ['ihm', 'noaa', 'bra', 'nor', 'fin'].forEach(id => vis(id, on && chartSrc === id));
+    vis('shom', on && chartSrc === 'shom'); ['ihm', 'noaa', 'bra', 'nor', 'fin', 'isl'].forEach(id => vis(id, on && chartSrc === id));
     vis('emod', on && chartSrc === 'osm'); vis('seamark', on && chartSrc === 'osm');
     if (on && chartSrc === 'sea' && !seaIds) addSeamap();
     (seaIds || []).forEach(id => vis(id, on && chartSrc === 'sea'));
@@ -2368,8 +2372,8 @@
     const pr = v => chartSrc0 !== 'auto' && chartSrc === v ? 'true' : 'false';
     el('chart-pick').value = chartSrc0 === 'auto' ? '' : chartSrc;
     el('chart-pick').setAttribute('aria-pressed', chartSrc0 === 'auto' ? 'false' : 'true');
-    el('chart-title').textContent = (chartSrc0 === 'auto' ? 'Auto · ' : '') + { ihm: 'Carte marine IHM, côtes d\u2019Espagne', noaa: 'Carte marine NOAA, États-Unis', bra: 'Carta náutica DHN, Brésil', nor: 'Sjøkart Kartverket, Norvège', fin: 'Merikartta Traficom, Finlande', shom: 'Carte littorale SHOM-IGN (Géoportail), côtes de France', sea: 'Fonds, balises et feux (Seamap)', osm: 'Balises et feux OpenSeaMap, sondes EMODnet (50 m et plus)' }[chartSrc];
-    el('chart-warn').textContent = chartSrc === 'ihm' ? 'Selon l\u2019IHM : non valable pour la navigation' : ['noaa', 'bra', 'nor', 'fin'].includes(chartSrc) ? 'Carte officielle gratuite : non valable pour la navigation' : chartSrc === 'shom' ? 'Mise à jour non garantie : ne pas utiliser pour naviguer' : 'Non officielle : ne remplace pas les cartes du SHOM';
+    el('chart-title').textContent = (chartSrc0 === 'auto' ? 'Auto · ' : '') + { ihm: 'Carte marine IHM, côtes d\u2019Espagne', noaa: 'Carte marine NOAA, États-Unis', bra: 'Carta náutica DHN, Brésil', nor: 'Sjøkart Kartverket, Norvège', fin: 'Merikartta Traficom, Finlande', isl: 'Sjókort LHG, Islande', shom: 'Carte littorale SHOM-IGN (Géoportail), côtes de France', sea: 'Fonds, balises et feux (Seamap)', osm: 'Balises et feux OpenSeaMap, sondes EMODnet (50 m et plus)' }[chartSrc];
+    el('chart-warn').textContent = chartSrc === 'ihm' ? 'Selon l\u2019IHM : non valable pour la navigation' : ['noaa', 'bra', 'nor', 'fin', 'isl'].includes(chartSrc) ? 'Carte officielle gratuite : non valable pour la navigation' : chartSrc === 'shom' ? 'Mise à jour non garantie : ne pas utiliser pour naviguer' : 'Non officielle : ne remplace pas les cartes du SHOM';
     }
     try { document.cookie = 'tiki_chart=0; Max-Age=0; Path=/; Secure; SameSite=Lax'; } catch (e) {}
   }
