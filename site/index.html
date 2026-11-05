@@ -24,13 +24,17 @@
 <div class="wave-scale chart-scale" id="chart-legend" hidden>
   <div class="chart-seg" role="group" aria-label="Type de carte marine">
     <button type="button" id="chart-auto" aria-pressed="true">Auto</button>
-    <button type="button" id="chart-more-btn" aria-expanded="false">Autres cartes</button>
-    <span class="chart-more" id="chart-more" hidden>
-    <button type="button" id="chart-osm" aria-pressed="false">Balises</button>
-    <button type="button" id="chart-sea" aria-pressed="false">Seamap</button>
-    <button type="button" id="chart-shom" aria-pressed="false">SHOM</button>
-    <button type="button" id="chart-ihm" aria-pressed="false">Espagne</button>
-    </span>
+    <select id="chart-pick" aria-label="Autres cartes">
+      <option value="" hidden>Autres cartes</option>
+      <option value="osm">Balises (OpenSeaMap)</option>
+      <option value="sea">Seamap</option>
+      <option value="shom">France (SHOM)</option>
+      <option value="ihm">Espagne (IHM)</option>
+      <option value="noaa">États-Unis (NOAA)</option>
+      <option value="bra">Brésil (DHN)</option>
+      <option value="nor">Norvège (Kartverket)</option>
+      <option value="fin">Finlande (Traficom)</option>
+    </select>
   </div>
   <div class="chart-txt"><b id="chart-title">Balises et feux OpenSeaMap, sondes EMODnet (50 m et plus)</b><span class="cur-warn" id="chart-warn">Non officielle : ne remplace pas les cartes du SHOM</span></div>
 </div>

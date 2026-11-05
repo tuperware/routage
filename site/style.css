@@ -630,8 +630,7 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
   .chart-scale .chart-txt { flex-basis: 100%; padding-left: 4px; }
   .chart-seg button { min-width: 0; padding: 0 9px; }
 }
-.chart-more { display: contents; }
-.chart-more[hidden], #chart-more-btn[hidden] { display: none; }
-#chart-more-btn { color: #4a6380; }
+#chart-pick { min-height: 40px; padding: 0 28px 0 10px; border: 0; border-radius: 6px; background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2323415f' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 9px center; color: #23415f; font: 600 13px/1 inherit; font-family: inherit; cursor: pointer; -webkit-appearance: none; appearance: none; }
+#chart-pick[aria-pressed="true"] { background-color: #fff; color: #0b3a5c; box-shadow: 0 1px 3px rgba(22,36,58,.25); }
 #book tr.manv td { background: #fff3e0; color: #8a4b0f; font-size: 13px; padding-top: 4px; padding-bottom: 4px; text-align: left; }
 #book tr.manv b { color: #b45309; }
