@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet">
 <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
-<link href="style.css?v=152" rel="stylesheet">
+<link href="style.css?v=153" rel="stylesheet">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -73,7 +73,9 @@
 <div class="tide-box" id="tide-box" hidden>
   <div class="tide-head"><div class="tide-ttl" id="tide-ttl" role="status" aria-live="polite">Touchez la mer à l'endroit voulu</div><button type="button" class="ruler-close" id="tide-close" aria-label="Fermer la marée">Fermer</button></div>
   <div class="tide-body" id="tide-body" hidden>
-    <label class="tide-sonde"><span>Sonde lue sur la carte</span><span class="num"><input type="number" id="tide-s" min="0" max="200" step="0.1" inputmode="decimal" placeholder="?"><i>m</i></span></label>
+    <label class="tide-sonde" id="tide-sl"><span>Sonde lue sur la carte</span><span class="num"><input type="number" id="tide-s" min="0" max="200" step="0.1" inputmode="decimal" placeholder="?"><i>m</i></span></label>
+    <div class="tide-warn" id="tide-warn">Entrez la sonde de la carte, sinon ces chiffres ne sont pas votre hauteur d'eau.</div>
+    <div class="tide-now" id="tide-now" hidden></div>
     <div class="tide-ext" id="tide-ext"></div>
     <svg class="tide-svg" id="tide-svg" aria-hidden="true"></svg>
     <div class="tide-tz" id="tide-tz"><div class="chart-seg tz-seg" role="group" aria-label="Heures affichées"><button type="button" id="tz-lieu" aria-pressed="true">Lieu</button><button type="button" id="tz-app" aria-pressed="false">Appareil</button><button type="button" id="tz-utc" aria-pressed="false">UTC</button></div><div id="tide-tz-txt"></div></div>
@@ -337,8 +339,8 @@
 </aside>
 
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-<script src="polar.js?v=152"></script>
-<script src="reefs.js?v=152"></script>
-<script src="app.js?v=152"></script>
+<script src="polar.js?v=153"></script>
+<script src="reefs.js?v=153"></script>
+<script src="app.js?v=153"></script>
 </body>
 </html>

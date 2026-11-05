@@ -2234,6 +2234,15 @@
     const nx = ext.filter(e => e.t > now - 1800e3).slice(0, 4);
         el('tide-ext').innerHTML = nx.map(e => `<span class="${e.hi ? 'pm' : 'bm'}"><b>${e.hi ? 'Haute' : 'Basse'}</b> ${fH.format(new Date(Math.round(e.t / 300e3) * 300e3))} <i>${tmfmt(e.h)}</i></span>`).join('')
       + `<span class="tide-key"><em class="k-now"></em>maintenant${dep > d0 && dep < t1 ? '<em class="k-dep"></em>départ' : ''}</span>`;
+    tideWater(pts, now, null);
+  }
+  // rappel de la sonde et hauteur d'eau en gros
+  function tideWater(P, t, fH) {
+    const S = tideS(); el('tide-warn').hidden = S != null; el('tide-sl').classList.toggle('need', S == null);
+    const o = el('tide-now'); if (S == null || !P || !P.length) { o.hidden = true; return; }
+    let i = P.findIndex(p => p[0] >= t); if (i <= 0) i = 1; if (i >= P.length) i = P.length - 1;
+    const a = P[i - 1], b = P[i], h = a[1] + (b[1] - a[1]) * Math.max(0, Math.min(1, (t - a[0]) / (b[0] - a[0])));
+    o.hidden = false; o.innerHTML = `Eau ${fH ? 'à ' + fH.format(new Date(t)) : 'maintenant'} : <b>${tmfmt(h)}</b>`;
   }
   // curseur : heure et hauteur au doigt (interpolation entre les heures)
   function tideAt(ev) {
@@ -2246,7 +2255,7 @@
     const X = c.X(t), Yv = c.Y(h), txt = `${c.fH.format(new Date(t))} · ${tideS() == null ? 'sonde ' : 'eau '}${tmfmt(h)}`;
     g.querySelector('line').setAttribute('x1', X); g.querySelector('line').setAttribute('x2', X);
     g.querySelector('circle').setAttribute('cx', X); g.querySelector('circle').setAttribute('cy', Yv);
-    const tx = g.querySelector('text'); tx.textContent = txt;
+    const tx = g.querySelector('text'); tx.textContent = txt; tideWater(P, t, c.fH);
     const right = X > c.W - 150; tx.setAttribute('x', right ? X - 6 : X + 6); tx.setAttribute('text-anchor', right ? 'end' : 'start');
   }
   (() => { const sv = el('tide-svg'); let dn = false;
