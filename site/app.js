@@ -1758,6 +1758,11 @@
       tiles: ['https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.COASTALMAPS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png'],
       attribution: 'Carte littorale © <a href="https://www.shom.fr" target="_blank">SHOM</a>-<a href="https://www.ign.fr" target="_blank">IGN</a> (<a href="https://www.geoportail.gouv.fr" target="_blank">Géoportail</a>)' });
     map.addLayer({ id: 'shom', type: 'raster', source: 'shom', layout: { visibility: 'none' } });
+    // Cartes marines électroniques de l'IHM (Instituto Hidrográfico de la Marina), côtes d'Espagne, accès public
+    map.addSource('ihm', { type: 'raster', tileSize: 256, minzoom: 5, maxzoom: 17, bounds: [-19.5, 26.5, 6.5, 45.5],
+      tiles: ['https://ideihm.covam.es/ihmcache/wmts/1.0.0/RasterENC/default/googlemapscompatible/{z}/{y}/{x}.png'],
+      attribution: 'Carte marine © <a href="https://ideihm.covam.es/portal/" target="_blank">IHM España</a>' });
+    map.addLayer({ id: 'ihm', type: 'raster', source: 'ihm', layout: { visibility: 'none' } });
     map.addLayer({ id: 'emod', type: 'raster', source: 'emod', layout: { visibility: chartOn ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.9 } });
     map.addLayer({ id: 'seamark', type: 'raster', source: 'seamark', layout: { visibility: chartOn ? 'visible' : 'none' } });
     map.addSource('wind', { type: 'geojson', data: EMPTY });
@@ -2291,13 +2296,13 @@
   el('ruler-close').addEventListener('click', () => rulerSet(false));
   // Bouton Carte marine : mémorisé dans un cookie
   // Choix de la carte (Balises ou SHOM) mémorisé dans un cookie ; la carte reste éteinte à l'ouverture
-  let chartSrc = (document.cookie.split('; ').find(c => /^tiki_chartsrc=(shom|sea|osm)$/.test(c)) || '=osm').split('=')[1];
+  let chartSrc = (document.cookie.split('; ').find(c => /^tiki_chartsrc=(shom|sea|osm|ihm)$/.test(c)) || '=osm').split('=')[1];
   function chartSet(on) {
     chartOn = on;
     el('chart-btn').setAttribute('aria-pressed', on ? 'true' : 'false');
     el('chart-legend').hidden = !on;
     const vis = (id, v) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none');
-    vis('shom', on && chartSrc === 'shom');
+    vis('shom', on && chartSrc === 'shom'); vis('ihm', on && chartSrc === 'ihm');
     vis('emod', on && chartSrc === 'osm'); vis('seamark', on && chartSrc === 'osm');
     if (on && chartSrc === 'sea' && !seaIds) addSeamap();
     (seaIds || []).forEach(id => vis(id, on && chartSrc === 'sea'));
@@ -2305,13 +2310,15 @@
     el('chart-osm').setAttribute('aria-pressed', chartSrc === 'osm' ? 'true' : 'false');
     el('chart-sea').setAttribute('aria-pressed', chartSrc === 'sea' ? 'true' : 'false');
     el('chart-shom').setAttribute('aria-pressed', chartSrc === 'shom' ? 'true' : 'false');
-    el('chart-title').textContent = { shom: 'Carte littorale SHOM-IGN (Géoportail), côtes de France', sea: 'Fonds, balises et feux (Seamap)', osm: 'Balises et feux OpenSeaMap, sondes EMODnet (50 m et plus)' }[chartSrc];
-    el('chart-warn').textContent = chartSrc === 'shom' ? 'Mise à jour non garantie : ne pas utiliser pour naviguer' : 'Non officielle : ne remplace pas les cartes du SHOM';
+    el('chart-ihm').setAttribute('aria-pressed', chartSrc === 'ihm' ? 'true' : 'false');
+    el('chart-title').textContent = { ihm: 'Carte marine IHM, côtes d\u2019Espagne', shom: 'Carte littorale SHOM-IGN (Géoportail), côtes de France', sea: 'Fonds, balises et feux (Seamap)', osm: 'Balises et feux OpenSeaMap, sondes EMODnet (50 m et plus)' }[chartSrc];
+    el('chart-warn').textContent = chartSrc === 'ihm' ? 'Selon l\u2019IHM : non valable pour la navigation' : chartSrc === 'shom' ? 'Mise à jour non garantie : ne pas utiliser pour naviguer' : 'Non officielle : ne remplace pas les cartes du SHOM';
     try { document.cookie = 'tiki_chart=0; Max-Age=0; Path=/; Secure; SameSite=Lax'; } catch (e) {}
   }
   const chartPick = v => { chartSrc = v; try { document.cookie = `tiki_chartsrc=${v}; Max-Age=31536000; Path=/; Secure; SameSite=Lax`; } catch (e) {} chartSet(true); };
   el('chart-osm').addEventListener('click', () => chartPick('osm'));
   el('chart-shom').addEventListener('click', () => chartPick('shom'));
+  el('chart-ihm').addEventListener('click', () => chartPick('ihm'));
   el('chart-sea').addEventListener('click', () => chartPick('sea'));
   el('chart-btn').addEventListener('click', () => chartSet(!chartOn));
   if (chartOn) chartSet(true);
