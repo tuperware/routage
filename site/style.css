@@ -624,3 +624,4 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 .tide-warn[hidden], .tide-now[hidden] { display: none; }
 .tide-now { margin: 0 0 6px; font-size: 16px; color: var(--ink); }
 .tide-now b { font-size: 22px; color: var(--sea); }
+.tide-coef { font-size: 16px; color: var(--ink-2); font-weight: 600; }

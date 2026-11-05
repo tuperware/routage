@@ -2153,7 +2153,8 @@
       const all = [];
       T.forEach((t, i) => { if (H[i] != null) all.push([t * 1000, H[i]]); });
       if (all.length < 48) { el('tide-ttl').textContent = 'Pas de données de marée à cet endroit'; el('tide-body').hidden = true; return; }
-      tideData = { all, tz, atSea };
+      tideData = { all, tz, atSea, med: isMed(ll.lat, ll.lng) };
+      if (!tideData.med) brestExt().then(pm => { brestPM = pm; if (seq === tideSeq && tideOn) tideRender(); });
       el('tide-ttl').innerHTML = 'Marée · ' + fmtPos({ lat: ll.lat, lon: ll.lng });
       tideRender();
       el('tide-body').hidden = false;
@@ -2162,6 +2163,27 @@
   const tzOff = (tz, t) => { try { const p = new Intl.DateTimeFormat('fr-CH', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(new Date(t)).find(x => x.type === 'timeZoneName'); return (p ? p.value : 'UTC').replace('GMT', 'UTC').replace('-', '−').replace(/^UTC$/, 'UTC+0'); } catch (e) { return 'UTC'; } };
   const tzName = (tz, t) => { try { const p = new Intl.DateTimeFormat('fr-FR', { timeZone: tz, timeZoneName: 'long' }).formatToParts(new Date(t)).find(x => x.type === 'timeZoneName'); return p && !/^(UTC|GMT)/.test(p.value) ? p.value : ''; } catch (e) { return ''; } };
   let tideCur = null, tideData = null;
+  // Coefficient de marée calculé à Brest (marnage / 6,10 m × 100), même valeur pour toute la côte ; pas en Méditerranée
+  let brestP = null;
+  const isMed = (lat, lon) => lon > -5.6 && lon < 42 && lat > 30 && lat < 47.5 && !(lon < 0.5 && lat > 43);
+  function brestExt() {
+    if (!brestP) brestP = fetch('https://marine-api.open-meteo.com/v1/marine?latitude=48.38&longitude=-4.495&hourly=sea_level_height_msl&timeformat=unixtime&cell_selection=sea&forecast_days=5&past_days=1')
+      .then(r => r.json()).then(j => {
+        const T = (j.hourly && j.hourly.time) || [], H = (j.hourly && j.hourly.sea_level_height_msl) || [], e = [];
+        for (let i = 1; i < T.length - 1; i++) {
+          const a = H[i - 1], b = H[i], c = H[i + 1]; if (a == null || b == null || c == null) continue;
+          const hi = b > a && b >= c, lo = b < a && b <= c; if (!hi && !lo) continue;
+          const den = a - 2 * b + c, off = den ? Math.max(-0.5, Math.min(0.5, (a - c) / (2 * den))) : 0;
+          e.push({ t: (T[i] + off * 3600) * 1000, h: b - (a - c) * off / 4, hi });
+        }
+        const pm = [];
+        for (let k = 1; k < e.length - 1; k++) if (e[k].hi && !e[k - 1].hi && !e[k + 1].hi) pm.push({ t: e[k].t, c: Math.round(Math.max(20, Math.min(120, (e[k].h - (e[k - 1].h + e[k + 1].h) / 2) / 6.1 * 100))) });
+        return pm;
+      }).catch(() => { brestP = null; return []; });
+    return brestP;
+  }
+  let brestPM = [];
+  const coefAt = t => { if (!tideData || tideData.med || !brestPM.length) return null; let b = null; for (const p of brestPM) if (!b || Math.abs(p.t - t) < Math.abs(b.t - t)) b = p; return b && Math.abs(b.t - t) < 9 * 3600e3 ? b.c : null; };
   // Choix des heures : lieu touché, appareil ou UTC (mémorisé dans un cookie)
   let tideZone = 'app'; // toujours l'heure de l'appareil
   const devTz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { return 'UTC'; } })();
@@ -2242,7 +2264,7 @@
     const o = el('tide-now'); if (S == null || !P || !P.length) { o.hidden = true; return; }
     let i = P.findIndex(p => p[0] >= t); if (i <= 0) i = 1; if (i >= P.length) i = P.length - 1;
     const a = P[i - 1], b = P[i], h = a[1] + (b[1] - a[1]) * Math.max(0, Math.min(1, (t - a[0]) / (b[0] - a[0])));
-    o.hidden = false; o.innerHTML = `Eau ${fH ? 'à ' + fH.format(new Date(t)) : 'maintenant'} : <b>${tmfmt(h)}</b>`;
+    const cf = coefAt(t); o.hidden = false; o.innerHTML = `Eau ${fH ? 'à ' + fH.format(new Date(t)) : 'maintenant'} : <b>${tmfmt(h)}</b>${cf != null ? ` <span class="tide-coef">· coef. ${cf}</span>` : ''}`;
   }
   // curseur : heure et hauteur au doigt (interpolation entre les heures)
   function tideAt(ev) {
