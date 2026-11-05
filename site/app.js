@@ -2333,7 +2333,10 @@
   }
   const chartPick = v => { chartSrc = v; try { document.cookie = `tiki_chartsrc=${v}; Max-Age=31536000; Path=/; Secure; SameSite=Lax`; } catch (e) {} chartSet(true); };
   el('chart-osm').addEventListener('click', () => chartPick('osm'));
-  el('chart-auto').addEventListener('click', () => chartPick('auto'));
+  const chartMore = open => { el('chart-more').hidden = !open; el('chart-more-btn').hidden = open; el('chart-more-btn').setAttribute('aria-expanded', open ? 'true' : 'false'); };
+  el('chart-auto').addEventListener('click', () => { chartPick('auto'); chartMore(false); });
+  el('chart-more-btn').addEventListener('click', () => chartMore(true));
+  chartMore(chartSrc !== 'auto');
   map.on('moveend', () => { if (chartOn && chartSrc === 'auto' && autoSrc() !== chartEff) chartSet(true); });
   el('chart-shom').addEventListener('click', () => chartPick('shom'));
   el('chart-ihm').addEventListener('click', () => chartPick('ihm'));

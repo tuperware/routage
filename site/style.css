@@ -630,3 +630,6 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
   .chart-scale .chart-txt { flex-basis: 100%; padding-left: 4px; }
   .chart-seg button { min-width: 0; padding: 0 9px; }
 }
+.chart-more { display: contents; }
+.chart-more[hidden], #chart-more-btn[hidden] { display: none; }
+#chart-more-btn { color: #4a6380; }
