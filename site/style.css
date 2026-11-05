@@ -617,3 +617,4 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 .night-bts { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .night-btn { min-height: 46px; padding: 8px 12px; font: inherit; font-weight: 600; color: var(--sea); background: var(--surface); border: 1px solid currentColor; border-radius: 10px; cursor: pointer; text-align: left; }
 .best-row.day { border: 2px solid #c8962a; background: #fdf6e6; }
+#best-go, #best-out { display: none !important; }
