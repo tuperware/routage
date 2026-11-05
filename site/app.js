@@ -2296,9 +2296,22 @@
   el('ruler-close').addEventListener('click', () => rulerSet(false));
   // Bouton Carte marine : mémorisé dans un cookie
   // Choix de la carte (Balises ou SHOM) mémorisé dans un cookie ; la carte reste éteinte à l'ouverture
-  let chartSrc = (document.cookie.split('; ').find(c => /^tiki_chartsrc=(shom|sea|osm|ihm)$/.test(c)) || '=osm').split('=')[1];
+  let chartSrc = (document.cookie.split('; ').find(c => /^tiki_chartsrc=(shom|sea|osm|ihm|auto)$/.test(c)) || '=auto').split('=')[1];
+  // Choix automatique selon le centre de l'écran : SHOM en France, IHM en Espagne, Balises ailleurs
+  const inB = (la, lo, a, b, c, d) => la >= a && la <= b && lo >= c && lo <= d;
+  function autoSrc() {
+    const c = map.getCenter(), la = c.lat, lo = c.lng, z = map.getZoom();
+    if (z < 6) return 'osm';
+    const es = inB(la, lo, 35.95, 42.43, -5.65, 4.6) || inB(la, lo, 41.85, 43.9, -9.9, -1.78) || inB(la, lo, 36, 37.4, -7.4, -5.65) || inB(la, lo, 27.4, 29.6, -18.4, -13.2);
+    if (es) return 'ihm';
+    const fr = (inB(la, lo, 41.3, 51.2, -5.8, 9.7) && !(lo > 7.53 && la > 43.2 && la < 46) && !(la > 50.2 && lo < 1.4) && !(la > 50.95 && lo > 2.6))
+      || inB(la, lo, 14, 18.2, -63.3, -60.7) || inB(la, lo, 1.9, 6.1, -54.8, -51.4) || inB(la, lo, -21.5, -20.7, 55.1, 55.95) || inB(la, lo, -13.1, -12.5, 44.9, 45.4) || inB(la, lo, 46.6, 47.2, -56.6, -55.9);
+    return fr ? 'shom' : 'osm';
+  }
+  let chartEff = 'osm';
   function chartSet(on) {
     chartOn = on;
+    const chartSrc0 = chartSrc; { const chartSrc = chartSrc0 === 'auto' ? autoSrc() : chartSrc0; chartEff = chartSrc;
     el('chart-btn').setAttribute('aria-pressed', on ? 'true' : 'false');
     el('chart-legend').hidden = !on;
     const vis = (id, v) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none');
@@ -2307,16 +2320,21 @@
     if (on && chartSrc === 'sea' && !seaIds) addSeamap();
     (seaIds || []).forEach(id => vis(id, on && chartSrc === 'sea'));
     vis('relief-shade', !(on && chartSrc === 'sea')); // Seamap a déjà son propre relief des fonds
-    el('chart-osm').setAttribute('aria-pressed', chartSrc === 'osm' ? 'true' : 'false');
-    el('chart-sea').setAttribute('aria-pressed', chartSrc === 'sea' ? 'true' : 'false');
-    el('chart-shom').setAttribute('aria-pressed', chartSrc === 'shom' ? 'true' : 'false');
-    el('chart-ihm').setAttribute('aria-pressed', chartSrc === 'ihm' ? 'true' : 'false');
-    el('chart-title').textContent = { ihm: 'Carte marine IHM, côtes d\u2019Espagne', shom: 'Carte littorale SHOM-IGN (Géoportail), côtes de France', sea: 'Fonds, balises et feux (Seamap)', osm: 'Balises et feux OpenSeaMap, sondes EMODnet (50 m et plus)' }[chartSrc];
+    el('chart-auto').setAttribute('aria-pressed', chartSrc0 === 'auto' ? 'true' : 'false');
+    const pr = v => chartSrc0 !== 'auto' && chartSrc === v ? 'true' : 'false';
+    el('chart-osm').setAttribute('aria-pressed', pr('osm'));
+    el('chart-sea').setAttribute('aria-pressed', pr('sea'));
+    el('chart-shom').setAttribute('aria-pressed', pr('shom'));
+    el('chart-ihm').setAttribute('aria-pressed', pr('ihm'));
+    el('chart-title').textContent = (chartSrc0 === 'auto' ? 'Auto · ' : '') + { ihm: 'Carte marine IHM, côtes d\u2019Espagne', shom: 'Carte littorale SHOM-IGN (Géoportail), côtes de France', sea: 'Fonds, balises et feux (Seamap)', osm: 'Balises et feux OpenSeaMap, sondes EMODnet (50 m et plus)' }[chartSrc];
     el('chart-warn').textContent = chartSrc === 'ihm' ? 'Selon l\u2019IHM : non valable pour la navigation' : chartSrc === 'shom' ? 'Mise à jour non garantie : ne pas utiliser pour naviguer' : 'Non officielle : ne remplace pas les cartes du SHOM';
+    }
     try { document.cookie = 'tiki_chart=0; Max-Age=0; Path=/; Secure; SameSite=Lax'; } catch (e) {}
   }
   const chartPick = v => { chartSrc = v; try { document.cookie = `tiki_chartsrc=${v}; Max-Age=31536000; Path=/; Secure; SameSite=Lax`; } catch (e) {} chartSet(true); };
   el('chart-osm').addEventListener('click', () => chartPick('osm'));
+  el('chart-auto').addEventListener('click', () => chartPick('auto'));
+  map.on('moveend', () => { if (chartOn && chartSrc === 'auto' && autoSrc() !== chartEff) chartSet(true); });
   el('chart-shom').addEventListener('click', () => chartPick('shom'));
   el('chart-ihm').addEventListener('click', () => chartPick('ihm'));
   el('chart-sea').addEventListener('click', () => chartPick('sea'));
