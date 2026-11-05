@@ -893,12 +893,25 @@
     return { tws, twd: norm360(deg(Math.atan2(-U, -V))), gu: Gw > 0.5 ? Math.max(tws, Gs / Gw) : null };
   }
 
-  // ---------- Vagues Open-Meteo Marine (même grille que le vent) ----------
-  let waves = null; // {off, nt, hs, cx, cy, tp} ; hs en m, direction d'où viennent les vagues
+  // ---------- Vagues Open-Meteo Marine (grille propre, plus fine que le vent près des côtes) ----------
+  // La grille du vent (0,25° pour ECMWF/GFS) est trop lâche pour les vagues : près d'une côte, ses points
+  // tombent sur la terre et la valeur du départ venait du large (ex. Cavalaire : mer du sud des îles).
+  // On prend une grille dédiée, de 0,05° (≈ 5 km) sur un petit trajet jusqu'à la maille du vent sur un grand,
+  // et chaque point est rattaché par Open-Meteo à la case de mer la plus proche (cell_selection=sea).
+  let waves = null; // {off, nt, hs, cx, cy, tp, lats, lons, step, nx, ny} ; hs en m, direction d'où viennent les vagues
   async function loadWaves(days, wm) {
-    const W = wind, pts = [];
-    for (const la of W.lats) for (const lo of W.lons) pts.push([la, lo]);
-    const keep = W.keep || pts.map((_, k) => k);
+    const W = wind;
+    const s = W.lats[0], n = W.lats[W.lats.length - 1], w = W.lons[0], e = W.lons[W.lons.length - 1];
+    const span = Math.max(n - s, e - w);
+    const step = Math.min(W.step, Math.max(0.05, Math.ceil((span / 16) * 20) / 20));
+    const lats = [], lons = [];
+    for (let y = s; y <= n + 1e-9; y += step) lats.push(+y.toFixed(3));
+    for (let x = w; x <= e + 1e-9; x += step) lons.push(+x.toFixed(3));
+    if (lats[lats.length - 1] < n - 1e-9) lats.push(+(lats[lats.length - 1] + step).toFixed(3));
+    if (lons[lons.length - 1] < e - 1e-9) lons.push(+(lons[lons.length - 1] + step).toFixed(3));
+    const nx = lons.length, ny = lats.length, pts = [], keep = [];
+    lats.forEach(la => lons.forEach(lo => { const k = pts.length; pts.push([la, lo]); if (!inland(la, lo, step)) keep.push(k); }));
+    if (!keep.length) return null;
     const chunks = [];
     for (let i = 0; i < keep.length; i += 80) chunks.push(keep.slice(i, i + 80).map(k => pts[k]));
     const results = new Array(chunks.length);
@@ -906,7 +919,7 @@
       const c = chunks[ci];
       const url = 'https://marine-api.open-meteo.com/v1/marine'
         + `?latitude=${c.map(p => p[0]).join(',')}&longitude=${c.map(p => p[1]).join(',')}`
-        + `&hourly=wave_height,wave_direction,wave_period&forecast_days=${Math.min(16, days)}&timezone=UTC${wm ? `&models=${wm}` : ''}`;
+        + `&hourly=wave_height,wave_direction,wave_period&forecast_days=${Math.min(16, days)}&timezone=UTC&cell_selection=sea${wm ? `&models=${wm}` : ''}`;
       const j = await omJson(url);
       results[ci] = Array.isArray(j) ? j : [j];
     }
@@ -915,34 +928,36 @@
     const got = results.flat();
     const flat = pts.map(() => ({ hourly: { wave_height: [], wave_direction: [], wave_period: [] } }));
     keep.forEach((k, i) => { flat[k] = got[i]; });
-    const tStr = got[0].hourly.time, nt = tStr.length, n = W.nx * W.ny;
-    const hs = new Float32Array(nt * n).fill(NaN), cx = new Float32Array(nt * n), cy = new Float32Array(nt * n), tp = new Float32Array(nt * n);
+    const tStr = got[0].hourly.time, nt = tStr.length, nn = nx * ny;
+    const hs = new Float32Array(nt * nn).fill(NaN), cx = new Float32Array(nt * nn), cy = new Float32Array(nt * nn), tp = new Float32Array(nt * nn);
     flat.forEach((loc, k) => {
-      const H = loc.hourly.wave_height, D = loc.hourly.wave_direction, T = loc.hourly.wave_period;
+      if (!loc || !loc.hourly) return;
+      const H = loc.hourly.wave_height || [], D = loc.hourly.wave_direction || [], T = loc.hourly.wave_period || [];
       for (let t = 0; t < nt; t++) {
         if (H[t] == null) continue;
-        const o = t * n + k;
+        const o = t * nn + k;
         hs[o] = H[t]; tp[o] = T[t] || 0;
         const d = rad(D[t] || 0); cx[o] = Math.sin(d); cy[o] = Math.cos(d);
       }
     });
-    return { off: (Date.parse(tStr[0] + 'Z') - W.t0) / 3.6e6, nt, hs, cx, cy, tp };
+    return { off: (Date.parse(tStr[0] + 'Z') - W.t0) / 3.6e6, nt, hs, cx, cy, tp, lats, lons, step, nx, ny };
   }
   // Vagues à un point et une heure (h = heures depuis wind.t0) : {hs, dir, tp} ou null (terre, hors prévision)
   function waveAt(lat, lon, h) {
-    const V = waves, W = wind;
-    if (!V || !W) return null;
+    const V = waves;
+    if (!V || !wind) return null;
     const t = h - V.off;
     if (t < 0 || t > V.nt - 1) return null;
-    const fx = (lon - W.lons[0]) / W.step, fy = (lat - W.lats[0]) / W.step;
-    if (fx < 0 || fy < 0 || fx > W.nx - 1 || fy > W.ny - 1) return null;
-    const x0 = Math.min(W.nx - 2, Math.floor(fx)), y0 = Math.min(W.ny - 2, Math.floor(fy));
-    const ax = fx - x0, ay = fy - y0, t0 = Math.min(V.nt - 2, Math.floor(t)), at = t - t0, n = W.nx * W.ny;
+    const G = V.lats ? V : { lats: wind.lats, lons: wind.lons, step: wind.step, nx: wind.nx, ny: wind.ny };
+    const fx = (lon - G.lons[0]) / G.step, fy = (lat - G.lats[0]) / G.step;
+    if (fx < 0 || fy < 0 || fx > G.nx - 1 || fy > G.ny - 1) return null;
+    const x0 = Math.min(G.nx - 2, Math.floor(fx)), y0 = Math.min(G.ny - 2, Math.floor(fy));
+    const ax = fx - x0, ay = fy - y0, t0 = Math.min(V.nt - 2, Math.floor(t)), at = t - t0, n = G.nx * G.ny;
     let S = 0, H = 0, X = 0, Y = 0, T = 0;
     for (let dt = 0; dt < 2; dt++) for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
       const w = (dt ? at : 1 - at) * (dy ? ay : 1 - ay) * (dx ? ax : 1 - ax);
       if (w === 0) continue;
-      const o = (t0 + dt) * n + (y0 + dy) * W.nx + x0 + dx;
+      const o = (t0 + dt) * n + (y0 + dy) * G.nx + x0 + dx;
       if (Number.isNaN(V.hs[o])) continue; // case sur la terre : on l'ignore
       S += w; H += w * V.hs[o]; X += w * V.cx[o]; Y += w * V.cy[o]; T += w * V.tp[o];
     }
