@@ -2903,10 +2903,20 @@
     r.wp = waypoints(r);
     map.getSource('nodes').setData({ type: 'FeatureCollection', features: r.wp.slice(1, -1).map(w => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [w.lon, w.lat] }, properties: {} })) });
     ui.book.innerHTML = '';
-    let lastDay = null;
+    let lastDay = null, prevS = null;
     r.wp.forEach((w, n) => {
       if (w.last) return;
       const twa = Math.abs(norm180(w.twd - w.hdg));
+      // Manœuvre quand on change d'amures entre deux lignes à la voile
+      if (!w.wait && !w.mot && !w.tack) {
+        const sd = side(w.hdg, w.twd);
+        if (prevS && prevS.sd !== sd) {
+          const gybe = prevS.twa + twa > 180, mv = document.createElement('tr'); mv.className = 'manv';
+          mv.innerHTML = `<td></td><td colspan="${r.useCur ? 8 : 7}"><b>${gybe ? 'Empannage' : 'Virement de bord'}</b> à ${tfmt.format(timeAt(w.h))} · passer ${sd} amures</td>`;
+          ui.book.appendChild(mv);
+        }
+        prevS = { sd, twa };
+      } else if (w.mot) prevS = null;
       const tr = document.createElement('tr');
       const tm = timeAt(w.h), dayK = tm.toDateString();
       const hh = dayK !== lastDay ? hfmt.format(tm) : tfmt.format(tm); lastDay = dayK;
