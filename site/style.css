@@ -370,7 +370,7 @@ tbody tr:hover { background: #eef4f8; }
 }
 
 /* Onglets du résultat */
-.tabs { display: grid; grid-template-columns: 1fr 1.35fr 1fr 1fr; gap: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #fff; }
+.tabs { display: grid; grid-template-columns: 1fr 1.35fr 1fr; gap: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #fff; }
 .tabs button { min-height: 48px; font: inherit; font-size: var(--text-sm); font-weight: 600; color: var(--ink-2); background: transparent; border: 0; border-left: 1px solid var(--line); cursor: pointer; padding: 4px 4px; line-height: 1.15; }
 .tabs button:first-child { border-left: 0; }
 .tabs button[aria-selected="true"] { background: var(--sea); color: #fff; }
@@ -618,3 +618,4 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 .night-btn { min-height: 46px; padding: 8px 12px; font: inherit; font-weight: 600; color: var(--sea); background: var(--surface); border: 1px solid currentColor; border-radius: 10px; cursor: pointer; text-align: left; }
 .best-row.day { border: 2px solid #c8962a; background: #fdf6e6; }
 #best-go, #best-out { display: none !important; }
+.tz-seg, #cmp-box, #tabs [data-t="analyse"] { display: none !important; }

@@ -2163,7 +2163,7 @@
   const tzName = (tz, t) => { try { const p = new Intl.DateTimeFormat('fr-FR', { timeZone: tz, timeZoneName: 'long' }).formatToParts(new Date(t)).find(x => x.type === 'timeZoneName'); return p && !/^(UTC|GMT)/.test(p.value) ? p.value : ''; } catch (e) { return ''; } };
   let tideCur = null, tideData = null;
   // Choix des heures : lieu touché, appareil ou UTC (mémorisé dans un cookie)
-  let tideZone = (document.cookie.split('; ').find(c => /^tiki_tidetz=(lieu|app|utc)$/.test(c)) || '=lieu').split('=')[1];
+  let tideZone = 'app'; // toujours l'heure de l'appareil
   const devTz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { return 'UTC'; } })();
   const offOf = (tz, t) => { const m = tzOff(tz, t).replace('−', '-').match(/UTC([+-])(\d+)(?::(\d+))?/); return m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] || 0)) * 60e3 : 0; };
   el('tide-s').addEventListener('input', () => tideRender());
