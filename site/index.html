@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet">
 <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
-<link href="style.css?v=163" rel="stylesheet">
+<link href="style.css?v=164" rel="stylesheet">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -70,7 +70,7 @@
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v15M8 9h8M5 13a7 7 0 0 0 14 0M12 5a1.8 1.8 0 1 0 0-.01" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="3.8" r="1.8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
     <span>Carte</span>
   </button>
-  <button type="button" class="fab-btn" id="gps-btn" aria-pressed="false" aria-label="Ma position GPS">
+  <button type="button" class="fab-btn" id="gps-btn" hidden aria-pressed="false" aria-label="Ma position GPS">
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     <span>Position</span>
   </button>
@@ -346,12 +346,13 @@
     Polaire : Tiki 38, chargé ou léger, ou la vôtre.
     <br>Logiciel libre © Tup, licence GPL-3.0 : <a href="sauvegarde/Routage_code_source.zip" download>code source (zip)</a>.
    </details>
+   <p class="foot-note">Aide au routage, ne remplace pas les cartes officielles.</p>
   </footer>
 </aside>
 
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-<script src="polar.js?v=163"></script>
-<script src="reefs.js?v=163"></script>
-<script src="app.js?v=163"></script>
+<script src="polar.js?v=164"></script>
+<script src="reefs.js?v=164"></script>
+<script src="app.js?v=164"></script>
 </body>
 </html>

@@ -1380,7 +1380,9 @@
     center: [5.5, 42.3],
     zoom: 5.2,
     attributionControl: { compact: true },
+    dragRotate: false, pitchWithRotate: false, maxPitch: 0, // carte toujours nord en haut
   });
+  map.touchZoomRotate.disableRotation(); map.keyboard.disableRotation();
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
   const scaleCtl = new maplibregl.ScaleControl({ unit: 'nautical' });
@@ -1882,9 +1884,10 @@
       const firstSym = (map.getStyle().layers.find(l => l.type === 'symbol') || {}).id;
       seaIds = [];
       for (const l of st.layers) {
-        if (!SEA_SRC.includes(l.source)) continue;
+        if (!SEA_SRC.includes(l.source) || l.id === 'land_area') continue;
         const L = JSON.parse(JSON.stringify(l).replace(/Noto Sans SemiBold/g, 'Noto Sans Bold'));
         L.id = 'sea-' + l.id;
+        if (l.id === 'depth-areas') L.paint = Object.assign({}, L.paint, { 'fill-opacity': 0.55 });
         L.layout = Object.assign({}, L.layout, { visibility: chartOn && chartSrc === 'sea' ? 'visible' : 'none' });
         try { map.addLayer(L, L.type === 'symbol' ? 'shom' : firstSym); seaIds.push(L.id); } catch (e) { console.warn('seamap', l.id, e.message); }
       }
@@ -2342,7 +2345,7 @@
   el('ruler-close').addEventListener('click', () => rulerSet(false));
   // Bouton Carte marine : mémorisé dans un cookie
   // Choix de la carte (Balises ou SHOM) mémorisé dans un cookie ; la carte reste éteinte à l'ouverture
-  let chartSrc = (document.cookie.split('; ').find(c => /^tiki_chartsrc=(shom|sea|osm|ihm|noaa|bra|nor|fin|isl|swe|auto)$/.test(c)) || '=auto').split('=')[1];
+  let chartSrc = 'sea'; // Seamap seul, fondu avec le relief
   // Choix automatique selon le centre de l'écran : SHOM en France, IHM en Espagne, Balises ailleurs
   const inB = (la, lo, a, b, c, d) => la >= a && la <= b && lo >= c && lo <= d;
   function autoSrc() {
@@ -2369,7 +2372,7 @@
     chartOn = on;
     const chartSrc0 = chartSrc; { const chartSrc = chartSrc0 === 'auto' ? autoSrc() : chartSrc0; chartEff = chartSrc;
     el('chart-btn').setAttribute('aria-pressed', on ? 'true' : 'false');
-    el('chart-legend').hidden = !on;
+    el('chart-legend').hidden = true;
     const vis = (id, v) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none');
     vis('shom', on && chartSrc === 'shom'); ['ihm', 'noaa', 'bra', 'nor', 'fin', 'isl', 'swe'].forEach(id => vis(id, on && chartSrc === id));
     vis('emod', on && chartSrc === 'osm'); vis('seamark', on && chartSrc === 'osm');
@@ -2725,7 +2728,7 @@
       if (r.error && r.rej && r.rej.land > 0) throw new Error(segTxt + 'Pas de route trouvée : la terre bloque le passage. Placez le départ et l\u2019arrivée bien en mer, ou ajoutez un point de passage.');
       if (r.error) throw new Error(segTxt + 'Pas de route trouvée : pas assez de vent sur le trajet. Autorisez le moteur (Réglages bateau) ou changez l\u2019heure de départ.');
 
-      return { ...r, h0, tStart, model: mName, modelId: model, wName, snapped: S0.some(x => x.moved > 0.05), coastCut: coastCut || !fineOn, hazCut, dmin: OPT.dmin, coastM: OPT.coast, noWaves: !waves, wind, waves, currents, useCur: !!(OPT.cur && currents) };
+      return { ...r, t0: wind.t0, h0, tStart, model: mName, modelId: model, wName, snapped: S0.some(x => x.moved > 0.05), coastCut: coastCut || !fineOn, hazCut, dmin: OPT.dmin, coastM: OPT.coast, noWaves: !waves, wind, waves, currents, useCur: !!(OPT.cur && currents) };
   }
 
   ui.go.addEventListener('click', () => { if (wxOn) wxClose(true); if (start && !end) closeRoute(); runMain(); });
@@ -2740,6 +2743,7 @@
     try {
       last = await computeRoute(model, false, say);
       showResult();
+      saveRoute(last);
     } catch (err) {
       say(err.message || String(err), true);
     } finally {
@@ -2873,7 +2877,7 @@
     }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
   });
 
-  function timeAt(h) { return new Date(wind.t0 + h * 3.6e6); }
+  function timeAt(h) { return new Date((last && last.t0 != null ? last.t0 : wind.t0) + h * 3.6e6); }
 
   // ---------- Simplification des points (Douglas-Peucker, sans couper la terre) ----------
   // Niveaux du plus détaillé au plus simple : écart toléré (milles) et découpage des longs bords (heures)
@@ -2921,7 +2925,7 @@
   }
   function waypoints(r) {
     const L = LEVELS[simplLevel];
-    const idx0 = simplify(r.legs, L.tol), idx = [];
+    const idx0 = r.simp && r.simp[simplLevel] ? r.simp[simplLevel] : simplify(r.legs, L.tol), idx = [];
     // Un long bord droit est découpé en étapes d'environ 1 h : même cap, mais vent et vagues mis à jour.
     idx0.forEach((i, n) => {
       idx.push(i);
@@ -3170,7 +3174,7 @@
     if (wait > 0) moins.push(`Attente de ${fmtDur(wait)} sur place pour laisser passer la mer.`);
     if (night > 1) moins.push(`Navigation de nuit : ${fmtDur(night)}.`);
     if (!sunUp(end.lat, end.lon, arr)) moins.push(`Arrivée de nuit (${hfmt.format(arr)}).`);
-    if (r.h0 + dur - (Date.now() - wind.t0) / 3.6e6 > 72) moins.push('Fin de route à plus de 3 jours : prévision moins sûre, à recalculer avant le départ.');
+    if (r.h0 + dur - (Date.now() - (r.t0 != null ? r.t0 : wind.t0)) / 3.6e6 > 72) moins.push('Fin de route à plus de 3 jours : prévision moins sûre, à recalculer avant le départ.');
     if (r.alt) moins.push(`Sans attente, arrivée ${hfmt.format(timeAt(r.alt.h))} mais vagues jusqu'à ${nf1.format(r.alt.hs)} m.`);
 
     const li = a => a.map(x => `<li>${x}</li>`).join('');
@@ -3440,7 +3444,7 @@
       set('now-twa', a.mot ? 'Moteur' : `${nf0.format(twa)}° ${side(a.hdg, a.twd)}${a.tack ? ' · louvoyage serré dans le passage étroit, moteur conseillé' : ''}`);
       const sv = a.mot ? null : sailFor(twa, a.tws);
       set('now-sail', a.mot ? 'Moteur' : sv ? sailTxt(sv) : '–');
-      const wv = waveAt(pos.lat, pos.lon, h);
+      const wv = waveAt(pos.lat, pos.lon, h) || (last && last.saved ? a.wv : null);
       set('now-wave', wv ? `${nf1.format(wv.hs)} m du ${nf0.format(wv.dir)}°, période ${nf0.format(wv.tp)} s` : 'pas de donnée');
       const cw = curAt(pos.lat, pos.lon, h);
       set('now-cur', cw ? `${nf1.format(cw.sp)} nds vers ${nf0.format(cw.dir)}°${nearCoast(pos.lat, pos.lon) ? ' · près des côtes : peu fiable' : ''}` : 'pas de donnée');
@@ -3640,6 +3644,7 @@
   appIcon();
 
   el('reset').addEventListener('click', () => {
+    clearSavedRoute();
     el('gpx-help').hidden = true;
     if (wxOn) wxClose(true); // Reset : on quitte aussi le mode Météo
     clearResult();
@@ -3654,6 +3659,80 @@
     mStart && mStart.remove(); mEnd && mEnd.remove(); mStart = mEnd = null;
     refresh();
   });
+
+  // ---------- Dernière route : gardée dans des cookies (compressée), rouverte telle quelle au démarrage ----------
+  const RTK = 'tiki_rt';
+  const rtOld = () => +((document.cookie.split('; ').find(c => c.startsWith(RTK + 'n=')) || '=0').split('=')[1]) || 0;
+  function clearSavedRoute() {
+    const old = rtOld();
+    for (let i = 0; i < old; i++) document.cookie = `${RTK}${i}=; Max-Age=0; Path=/; Secure; SameSite=Lax`;
+    document.cookie = `${RTK}n=; Max-Age=0; Path=/; Secure; SameSite=Lax`;
+  }
+  const b64u = u8 => { let t = ''; for (let i = 0; i < u8.length; i += 0x8000) t += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(t).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  const unb64u = t => Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+  async function zip(str, inflate) {
+    const cs = inflate ? new DecompressionStream('deflate-raw') : new CompressionStream('deflate-raw');
+    const out = new Response(new Blob([inflate ? str : new TextEncoder().encode(str)]).stream().pipeThrough(cs));
+    return inflate ? out.text() : new Uint8Array(await out.arrayBuffer());
+  }
+  async function saveRoute(r) {
+    try {
+      if (!r || !r.legs || typeof CompressionStream === 'undefined') return;
+      const K = ['t0', 'h0', 'dist', 'dur', 'dt', 'alt', 'vias', 'model', 'modelId', 'wName', 'snapped', 'coastCut', 'hazCut', 'dmin', 'coastM', 'noWaves', 'useCur'];
+      const base = { v: 1, ts: ui.tStart.value, at: Date.now(), pts: [start, ...vias.map(v => v.p), end].map(p => [p.lat, p.lon]), r: Object.fromEntries(K.map(k => [k, r[k]])) };
+      const leg = l => { const o = {}; for (const k in l) if (l[k] != null && l[k] !== false && typeof l[k] !== 'function') o[k] = l[k]; return o; };
+      const rnd = (k, v) => (typeof v === 'number' ? Math.round(v * 1e5) / 1e5 : v);
+      let legs = r.legs, v = '';
+      // Points de la feuille de route tels qu'au calcul (la côte précise n'est plus chargée à la réouverture)
+      const simp = LEVELS.map(L => simplify(r.legs, L.tol));
+      for (let pass = 0; pass < 6; pass++) {
+        v = b64u(await zip(JSON.stringify({ ...base, r: { ...base.r, legs: legs.map(leg), simp: legs === r.legs ? simp : null } }, rnd)));
+        if (v.length <= 9000) break;
+        const L = legs; legs = L.filter((l, i) => i % 2 === 0 || i === L.length - 1 || !!l.mot !== !!(L[i - 1] && L[i - 1].mot) || l.wait);
+        v = '';
+      }
+      if (!v) return;
+      clearSavedRoute();
+      const n = Math.ceil(v.length / 3000);
+      for (let i = 0; i < n; i++) document.cookie = `${RTK}${i}=${v.slice(i * 3000, (i + 1) * 3000)}; Max-Age=31536000; Path=/; Secure; SameSite=Lax`;
+      document.cookie = `${RTK}n=${n}; Max-Age=31536000; Path=/; Secure; SameSite=Lax`;
+    } catch (e) {}
+  }
+  async function loadSavedRoute() {
+    try {
+      const n = rtOld(); if (!n || typeof DecompressionStream === 'undefined' || start || last) return;
+      const C = Object.fromEntries(document.cookie.split('; ').map(c => { const i = c.indexOf('='); return [c.slice(0, i), c.slice(i + 1)]; }));
+      let v = ''; for (let i = 0; i < n; i++) { if (C[RTK + i] == null) return; v += C[RTK + i]; }
+      const o = JSON.parse(await zip(unb64u(v), true));
+      if (!o || o.v !== 1 || !o.pts || o.pts.length < 2 || !o.r || !o.r.legs || o.r.legs.length < 2) return;
+      if (start || last) return;
+      const P = o.pts;
+      setPoint('start', { lat: P[0][0], lng: P[0][1] });
+      P.slice(1, -1).forEach(q => addVia({ lat: q[0], lon: q[1] }));
+      setPoint('end', { lat: P[P.length - 1][0], lng: P[P.length - 1][1] });
+      o.r.legs.forEach(l => { for (const k of ['hdg', 'tws', 'twd', 'bsp', 'wv', 'cog', 'sog', 'cu']) if (l[k] === undefined) l[k] = null; l.mot = !!l.mot; });
+      if (o.ts) { ui.tStart.value = o.ts; tStartSet = true; }
+      // Côtes autour de la route (pour la feuille de route : mêmes points que lors du calcul)
+      try {
+        const la = o.r.legs.map(l => l.lat), lo = o.r.legs.map(l => l.lon), mg = 0.3;
+        await loadMasks({ s: Math.min(...la) - mg, n: Math.max(...la) + mg, w: Math.min(...lo) - mg, e: Math.max(...lo) + mg });
+        fineOn = true; coastM = o.r.coastM != null ? o.r.coastM : OPT.coast; coastNear = P.map(q => ({ lat: q[0], lon: q[1] }));
+        await loadFineKeys(fineKeysAlong(o.r.legs));
+      } catch (e) {}
+      if (start !== null && last) return;
+      last = { ...o.r, saved: true };
+      showResult();
+      const b = map.getBounds(), L = last.legs;
+      const bb = L.reduce((a, l) => [Math.min(a[0], l.lon), Math.min(a[1], l.lat), Math.max(a[2], l.lon), Math.max(a[3], l.lat)], [180, 90, -180, -90]);
+      void b;
+      const ph = isMobile() ? panel.getBoundingClientRect().height : 0, pw = !isMobile() ? panel.getBoundingClientRect().right : 0;
+      map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: { top: 70, bottom: Math.min(ph + 30, innerHeight * 0.6), left: pw + 60, right: 100 }, duration: 0, maxZoom: 13 });
+      const d = new Date(o.at), dt = `${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+      el('peek').insertAdjacentHTML('beforeend', `<small>Route enregistrée le ${dt}, météo de ce moment-là</small>`);
+      say(`Dernière route, calculée le ${dt} avec la météo de ce moment-là. Touchez « Relancer » pour la mettre à jour.`);
+    } catch (e) {}
+  }
+  if (map.loaded()) setTimeout(loadSavedRoute, 300); else map.once('load', () => setTimeout(loadSavedRoute, 300));
 
   function buildGpx() {
     const r = last; if (!r) return false;

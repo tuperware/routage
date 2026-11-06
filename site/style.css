@@ -333,8 +333,15 @@ tbody tr:hover { background: #eef4f8; }
     box-shadow: 0 8px 30px rgba(22, 36, 58, .18); padding: 10px 12px;
   }
   .panel .result .scrub .now { border: 0; padding: 0; background: transparent; }
-  .panel .result .scrub .now-grid { grid-template-columns: repeat(4, 1fr); }
-  .panel .result .scrub .now-grid .wide { grid-column: span 2; }
+  /* Fiche compacte : libellé et valeur sur la même ligne, pour laisser voir la carte (tablette, PC) */
+  .panel .result .scrub { padding: 6px 10px; }
+  .panel .result .scrub .now-time { margin-bottom: 2px; font-size: 14px; }
+  .panel .result .scrub .now-grid { display: flex; flex-wrap: wrap; gap: 0 14px; font-size: 13px; }
+  .panel .result .scrub .now-grid > div { display: flex; align-items: baseline; gap: 5px; }
+  .panel .result .scrub .now-grid > div[hidden] { display: none; }
+  .panel .result .scrub .now-grid .label { margin: 0; font-size: 11px; }
+  .panel .result .scrub .now-grid b { display: inline; font-size: 13px; }
+  .panel .result .scrub .scrub-row { margin-top: 4px; }
 }
 /* Calculer + Reset côte à côte */
 .go-row { display: flex; gap: 8px; align-items: stretch; }
@@ -639,3 +646,4 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 #chart-pick[aria-pressed="true"] { background-color: #fff; color: #0b3a5c; box-shadow: 0 1px 3px rgba(22,36,58,.25); }
 #book tr.manv td { background: #fff3e0; color: #8a4b0f; font-size: 13px; padding-top: 4px; padding-bottom: 4px; text-align: left; }
 #book tr.manv b { color: #b45309; }
+.foot-note { margin: 4px 0 0; font-size: 12px; color: #5b6b7d; }
