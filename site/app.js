@@ -2361,6 +2361,10 @@
     return fr ? 'shom' : 'osm';
   }
   let chartEff = 'osm';
+  // Téléphone : nom de la carte et avertissement visibles 5 s, puis repliés ; on les revoit en touchant le cadre
+  let chartTxt0 = '', chartTxtT = 0;
+  function chartTxtShow() { const lg = el('chart-legend'); lg.classList.remove('quiet'); clearTimeout(chartTxtT); chartTxtT = setTimeout(() => lg.classList.add('quiet'), 5000); }
+  el('chart-legend').addEventListener('click', e => { if (e.target.closest('button, select')) return; const lg = el('chart-legend'); if (lg.classList.contains('quiet')) chartTxtShow(); else { clearTimeout(chartTxtT); lg.classList.add('quiet'); } });
   function chartSet(on) {
     chartOn = on;
     const chartSrc0 = chartSrc; { const chartSrc = chartSrc0 === 'auto' ? autoSrc() : chartSrc0; chartEff = chartSrc;
@@ -2378,6 +2382,7 @@
     el('chart-pick').setAttribute('aria-pressed', chartSrc0 === 'auto' ? 'false' : 'true');
     el('chart-title').textContent = (chartSrc0 === 'auto' ? 'Auto · ' : '') + { ihm: 'Carte marine IHM, côtes d\u2019Espagne', noaa: 'Carte marine NOAA, États-Unis', bra: 'Carta náutica DHN, Brésil', nor: 'Sjøkart Kartverket, Norvège', fin: 'Merikartta Traficom, Finlande', isl: 'Sjókort LHG, Islande', swe: 'Sjökort Sjöfartsverket, Suède', shom: 'Carte littorale SHOM-IGN (Géoportail), côtes de France', sea: 'Fonds, balises et feux (Seamap)', osm: 'Balises et feux OpenSeaMap, sondes EMODnet (50 m et plus)' }[chartSrc];
     el('chart-warn').textContent = chartSrc === 'ihm' ? 'Selon l\u2019IHM : non valable pour la navigation' : ['noaa', 'bra', 'nor', 'fin', 'isl', 'swe'].includes(chartSrc) ? 'Carte officielle gratuite : non valable pour la navigation' : chartSrc === 'shom' ? 'Mise à jour non garantie : ne pas utiliser pour naviguer' : 'Non officielle : ne remplace pas les cartes du SHOM';
+    const tt = on ? el('chart-title').textContent : ''; if (tt && tt !== chartTxt0) chartTxtShow(); chartTxt0 = tt;
     }
     try { document.cookie = 'tiki_chart=0; Max-Age=0; Path=/; Secure; SameSite=Lax'; } catch (e) {}
   }
@@ -2449,8 +2454,10 @@
   // ---------- Panneau repliable (mobile) ----------
   const panel = el('panel'), handle = el('sheet-handle');
   const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
-  function setSheet(open) {
+  // Trois positions : ouvert, replié, réduit (une barre avec « Calculer la route »)
+  function setSheet(open, mini = false) {
     panel.classList.toggle('collapsed', !open);
+    panel.classList.toggle('mini', !open && mini);
     document.body.classList.toggle('sheet-open', open);
     handle.setAttribute('aria-expanded', String(open));
     el('sheet-label').textContent = open ? '\u25BC Voir la carte' : (last ? '\u25B2 Détails de la route' : '\u25B2 Plus d\u2019options');
@@ -2461,9 +2468,14 @@
   handle.addEventListener('touchend', e => {
     if (swipeY == null) return;
     const dy = e.changedTouches[0].clientY - swipeY; swipeY = null;
-    if (Math.abs(dy) > 25) { swiped = true; setSheet(dy < 0); }
+    if (Math.abs(dy) > 25) {
+      swiped = Date.now();
+      const st = !panel.classList.contains('collapsed') ? 2 : panel.classList.contains('mini') ? 0 : 1;
+      const nx = Math.max(0, Math.min(2, st + (dy < 0 ? 1 : -1)));
+      setSheet(nx === 2, nx === 0);
+    }
   });
-  handle.addEventListener('click', () => { if (swiped) { swiped = false; return; } setSheet(panel.classList.contains('collapsed')); });
+  handle.addEventListener('click', () => { if (swiped && Date.now() - swiped < 500) { swiped = false; return; } swiped = false; if (panel.classList.contains('mini')) setSheet(false); else setSheet(panel.classList.contains('collapsed')); });
   map.getCanvas().addEventListener('touchstart', () => { if (isMobile() && !panel.classList.contains('collapsed')) setSheet(false); }, { passive: true });
   setSheet(false);
 

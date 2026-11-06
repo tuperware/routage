@@ -259,6 +259,11 @@ tbody tr:hover { background: #eef4f8; }
   .panel.collapsed .result > :not(.scrub):not(.quick) { display: none; }
   .panel.collapsed .now-grid { display: none; }
   .panel.collapsed .msg:empty, .panel.collapsed.has-result .msg:not(.err) { display: none; }
+  .panel.collapsed.mini > :not(.sheet-handle):not(.peek):not(.go-row):not(.msg) { display: none; }
+  .panel.collapsed.mini > .msg:not(.err), .panel.collapsed.mini .peek small { display: none; }
+  .panel.collapsed.mini .sheet-handle { min-height: 44px; padding: 6px 16px 6px; gap: 4px; }
+  .panel.collapsed.mini .sheet-handle { border-bottom: 0; }
+  .chart-scale.quiet .chart-txt { display: none; }
   .panel.has-result .peek { display: block; font-size: var(--text-base); font-weight: 600; font-variant-numeric: tabular-nums; }
   .peek small { display: block; font-weight: 500; font-size: var(--text-xs); color: var(--muted); }
 }
