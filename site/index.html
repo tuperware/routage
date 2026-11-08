@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet">
 <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
-<link href="style.css?v=165" rel="stylesheet">
+<link href="style.css?v=166" rel="stylesheet">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -147,7 +147,6 @@
         <span><b>Polaire de base</b></span>
         <p class="pk-now" id="pk-now">Tiki 38 – Chargé</p>
         <div class="seg pk pk3" id="o-pk" data-v="c"><span class="pk-h">Tiki 38</span><button type="button" data-v="c">Chargé</button><button type="button" data-v="l">Léger</button><span class="pk-h pk-xo">Autre bateau</span><button type="button" data-v="x" id="o-x-btn" class="pk-x pk-xo"></button></div>
-        <div class="px-row"><select class="btn orc-pick" id="o-orc" aria-label="Choisir un bateau"><option value="">Choisir un bateau (polaires ORC)…</option><option value="beneteau_oceanis_38_1">Beneteau Oceanis 38.1</option><option value="beneteau_oceanis_40_1">Beneteau Oceanis 40.1</option><option value="beneteau_oceanis_43">Beneteau Oceanis 43</option><option value="beneteau_oceanis_46_1">Beneteau Oceanis 46.1</option><option value="beneteau_first_40_7">Beneteau First 40.7</option><option value="jeanneau_sun_odyssey_349">Jeanneau Sun Odyssey 349</option><option value="jeanneau_sun_odyssey_410">Jeanneau Sun Odyssey 410</option><option value="jeanneau_sun_odyssey_440">Jeanneau Sun Odyssey 440</option><option value="jeanneau_sun_fast_3200">Jeanneau Sun Fast 3200</option><option value="dufour_390">Dufour 390 Grand Large</option><option value="dufour_412">Dufour 412 Grand Large</option><option value="dufour_430">Dufour 430 Grand Large</option><option value="hanse_388">Hanse 388</option><option value="hanse_418">Hanse 418</option><option value="dehler_38">Dehler 38</option><option value="elan_impression_40">Elan Impression 40</option><option value="bavaria_cruiser_46">Bavaria Cruiser 46</option><option value="bavaria_cruiser_41s">Bavaria Cruiser 41S</option><option value="bavaria_40_cruiser">Bavaria 40 Cruiser</option><option value="bavaria_37_cruiser">Bavaria 37 Cruiser</option><option value="bavaria_35_match">Bavaria 35 Match</option><option value="bavaria_38_match">Bavaria 38 Match</option><option value="bavaria_42_match">Bavaria 42 Match</option></select></div>
         <div class="px-row"><button type="button" class="btn" id="o-x-change">+ Importer la polaire d'un autre bateau</button></div>
         <small class="pk-txt" id="o-pk-txt"></small>
         <p class="px-msg" id="o-x-msg" role="status" aria-live="polite"></p>
@@ -344,7 +343,7 @@
    <details class="foot-src"><summary>Sources et limites</summary>
     Vent : <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>, 10 m. Vagues : <a href="https://open-meteo.com/en/docs/marine-weather-api" target="_blank" rel="noopener">Open-Meteo Marine</a> (MFWAM Météo-France avec AROME et ARPEGE, ECMWF WAM, GFS Wave, DWD EWAM), hauteur significative, peu fiable près des côtes.
     Côtes : Natural Earth 1:10 m et OpenStreetMap près des côtes. Fonds et dangers : © <a href="https://openwaters.io/charts/seascape" target="_blank" rel="noopener">Open Waters: Seascape</a> (CC BY 4.0), OpenSeaMap. Aide à la préparation : ne remplace pas les cartes marines.
-    Polaire : Tiki 38, chargé ou léger, ou la vôtre. Autres bateaux : polaires calculées depuis les certificats ORC en vigueur, © <a href="https://orc.org/" target="_blank" rel="noopener">Offshore Racing Congress</a> (<a href="https://data.orc.org/public/WPub.dll" target="_blank" rel="noopener">data.orc.org</a>), vitesses de course, réglées à 85 %, pas de données au-delà de 24 nds. Retirées sur simple demande de l'ORC.
+    Polaire : Tiki 38, chargé ou léger, ou la vôtre.
     <br>Logiciel libre © Tup, licence GPL-3.0 : <a href="sauvegarde/Routage_code_source.zip" download>code source (zip)</a>.
    </details>
    <p class="foot-note">Aide au routage, ne remplace pas les cartes officielles.</p>
@@ -352,8 +351,8 @@
 </aside>
 
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-<script src="polar.js?v=165"></script>
-<script src="reefs.js?v=165"></script>
-<script src="app.js?v=165"></script>
+<script src="polar.js?v=166"></script>
+<script src="reefs.js?v=166"></script>
+<script src="app.js?v=166"></script>
 </body>
 </html>

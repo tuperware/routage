@@ -3574,24 +3574,6 @@
     el('o-pk').dataset.v = b.dataset.v; saveOpt();
   }));
   el('o-x-change').addEventListener('click', () => el('o-file').click());
-  // Bateaux courants : polaires tirées des certificats ORC (vitesses de course, d'où 85 % par défaut)
-  el('o-orc').addEventListener('change', async e => {
-    const k = e.target.value, opt = e.target.selectedOptions[0]; if (!k) return;
-    const msg = el('o-x-msg');
-    try {
-      const r = await fetch(`polaires/orc/${k}.pol`); if (!r.ok) throw new Error('fichier introuvable');
-      const p = parsePolarText(await r.text());
-      POLARS.x = p; PX_NAME = opt.textContent;
-      savePx(PX_NAME, p);
-      el('o-pol').value = 85;
-      msg.textContent = `${PX_NAME} : polaire ORC (course), réglée à 85 % pour la croisière. Pas de données au-delà de ${nf0.format(p.tws[p.tws.length - 1])} nds.`;
-      msg.classList.remove('err');
-      el('o-pk').dataset.v = 'x'; polKey = ''; saveOpt();
-      { const ib = el('o-ico').querySelector('button[data-v="m"]'); if (ib && OPT.ico !== 'm') ib.click(); }
-      if (last && last.legs) say('Polaire changée : touchez « Calculer la route » pour mettre la route à jour.');
-    } catch (x) { msg.textContent = `Polaire non chargée : ${x.message}`; msg.classList.add('err'); }
-    e.target.value = '';
-  });
   el('o-file').addEventListener('change', async () => {
     const f = el('o-file').files[0]; el('o-file').value = '';
     if (!f) return;
