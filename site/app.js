@@ -1229,7 +1229,8 @@
         }
         // Repli : le bord d'origine
         legs.push({ lat: a.lat, lon: a.lon, h: Math.max(t, a.h), hdg: b.hdg, tws: b.tws, twd: b.twd, bsp: b.bsp, mot: b.mot, wv: b.wv, cog: b.cog, sog: b.sog, cu: b.cu });
-        i++; t = b.h;
+        // Retard gardé : sinon le bord suivant paraît couvert en quelques minutes
+        i++; t = b.h + Math.max(0, t - a.h);
         continue;
       }
       legs.push(...done.r.pts);
@@ -1256,7 +1257,7 @@
         const r = sailStraight({ lat: legs[i].lat, lon: legs[i].lon }, legs[j], t, dt, legs[j].h + 0.02, undefined, !!legs[i].mot);
         if (r) { done = { j, r }; break; }
       }
-      if (!done) { out.push({ ...legs[i], h: Math.max(t, legs[i].h) }); t = Math.max(t, legs[i + 1].h); i++; continue; }
+      if (!done) { out.push({ ...legs[i], h: Math.max(t, legs[i].h) }); t = legs[i + 1].h + Math.max(0, t - legs[i].h); i++; continue; }
       out.push(...done.r.pts);
       i = done.j; t = done.r.h;
     }
@@ -1306,7 +1307,9 @@
       }
       if (!done) {
         const g = gy.find(x => x > i) || n - 1;
-        out.push(...legs.slice(i, g)); i = g; t = legs[g].h; continue;
+        // Bords regroupés plus tôt : l'heure d'arrivée a pu bouger, on décale la suite d'autant
+        const dh = t - legs[i].h;
+        out.push(...legs.slice(i, g).map(l => ({ ...l, h: l.h + dh }))); i = g; t = legs[g].h + dh; continue;
       }
       out.push(...done.pts); i = done.j; t = done.h;
     }
