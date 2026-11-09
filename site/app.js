@@ -1668,20 +1668,24 @@
       // Monocoque de croisière : coque à tableau, rouf, cockpit avec barre à roue, gréement en tête
       d.dataset.hw = '9'; d.dataset.sc = '11,1'; d.dataset.sy = '50';
       d.innerHTML = `<svg viewBox="${VB.x} ${VB.y} ${VB.w} ${VB.h}" aria-hidden="true">
-      <path d="M20 0 C28.5 9 30 34 28.6 64 L11.4 64 C10 34 11.5 9 20 0 Z" fill="#fbfbfa" stroke="#1d2733" stroke-width="0.9"/>
-      <path d="M20 2.2 C26.8 10 28 34 26.8 62 L13.2 62 C12 34 13.2 10 20 2.2 Z" fill="#e6d3ad" stroke="#a7783f" stroke-width="0.4"/>
-      <rect x="14.2" y="20" width="11.6" height="22" rx="4" fill="#f1f3f4" stroke="#556270" stroke-width="0.6"/>
-      <path d="M15.5 21.5 L24.5 21.5 L24 25 L16 25 Z" fill="#5d7387"/>
-      <rect x="14.5" y="45" width="11" height="15" rx="1.5" fill="#d9b27a" stroke="#7a4a22" stroke-width="0.5"/>
-      <circle cx="20" cy="56" r="3" fill="none" stroke="#1d2733" stroke-width="0.8"/>
+      <path d="M20 -1 C26.6 8 28.6 30 27.4 64 L12.6 64 C11.4 30 13.4 8 20 -1 Z" fill="#fbfbfa" stroke="#1d2733" stroke-width="0.9"/>
+      <path d="M20 1.4 C25.4 9 27 30 26 62.4 L14 62.4 C13 30 14.6 9 20 1.4 Z" fill="#e6d3ad" stroke="#a7783f" stroke-width="0.4"/>
+      <g stroke="#c9ab78" stroke-width="0.35"><path d="M17.6 8 C16.2 24 15.8 44 16 62"/><path d="M22.4 8 C23.8 24 24.2 44 24 62"/></g>
+      <path d="M20 -0.2 C25.8 8.4 27.6 30 26.6 63.2" stroke="#8a97a3" stroke-width="0.4" fill="none"/><path d="M20 -0.2 C14.2 8.4 12.4 30 13.4 63.2" stroke="#8a97a3" stroke-width="0.4" fill="none"/>
+      <path d="M15.2 17 Q20 14.2 24.8 17 L25 40 Q20 41.4 15 40 Z" fill="#f1f3f4" stroke="#556270" stroke-width="0.6"/>
+      <path d="M16.4 18.6 Q20 16.8 23.6 18.6 L23.4 22 L16.6 22 Z" fill="#5d7387"/>
+      <rect x="16.6" y="25" width="1.6" height="5" rx="0.6" fill="#8fa3b5"/><rect x="21.8" y="25" width="1.6" height="5" rx="0.6" fill="#8fa3b5"/>
+      <rect x="15.4" y="44" width="9.2" height="16" rx="2" fill="#d9b27a" stroke="#7a4a22" stroke-width="0.5"/>
+      <g stroke="#a7783f" stroke-width="0.35"><line x1="17.6" y1="45" x2="17.6" y2="59"/><line x1="20" y1="45" x2="20" y2="51.6"/><line x1="22.4" y1="45" x2="22.4" y2="59"/></g>
+      <circle cx="20" cy="56" r="2.8" fill="none" stroke="#1d2733" stroke-width="0.8"/><line x1="20" y1="53.2" x2="20" y2="58.8" stroke="#1d2733" stroke-width="0.4"/>
       <g class="spi" display="none"><g class="spi-rot">
         <path d="M9 1 Q10.5 -17 20 -21 Q29.5 -17 31 1 Q20 -7 9 1 Z" fill="#d8452f" stroke="#1d2733" stroke-width="0.9" stroke-linejoin="round"/>
         <path d="M14.5 -3.4 Q15.8 -16 20 -18 Q24.2 -16 25.5 -3.4 Q20 -6 14.5 -3.4 Z" fill="#fffdf5"/>
         <path d="M18.2 -4.8 Q18.7 -14 20 -15 Q21.3 -14 21.8 -4.8 Q20 -5.4 18.2 -4.8 Z" fill="#1f5f99"/>
       </g><path class="spi-sheet" d="" stroke="#1d2733" stroke-width="0.5" fill="none"/></g>
-      ${sail('sail-j', 20, 2, 19, 'jib')}
-      ${sail('sail-m', 20, 21, 25, 'main')}
-      ${mast(21)}
+      ${sail('sail-j', 20, 0.5, 33, 'genoa')}
+      ${sail('sail-m', 20, 18, 36, 'mainx')}
+      ${mast(18)}
     </svg>`;
       return d;
     }
@@ -1744,19 +1748,20 @@
     elB.querySelectorAll('.sail').forEach(g => {
       const mx = +g.dataset.x, my = +g.dataset.y, L = +g.dataset.l, k = g.dataset.k;
       const cloth = g.querySelector('.sail-cloth'), spar = g.querySelector('.sail-spar');
-      if (k === 'jib') {
+      if (k === 'jib' || k === 'genoa') {
         if (mot || spi) { cloth.setAttribute('d', ''); spar.setAttribute('d', ''); return; }
-        const a = Math.min(60, base * 0.8);
-        const c = pt(mx, my, L, a), m = pt(mx, my, L * 0.6, a + 22);
+        const a = Math.min(60, base * 0.8), gn = k === 'genoa';
+        const c = pt(mx, my, L, a), m = pt(mx, my, L * (gn ? 0.68 : 0.6), a + (gn ? 34 : 22));
         cloth.setAttribute('d', `M${mx} ${my} Q${m[0].toFixed(1)} ${m[1].toFixed(1)} ${c[0].toFixed(1)} ${c[1].toFixed(1)} Z`);
         spar.setAttribute('d', '');
         return;
       }
       const b = pt(mx, my, L, base);                      // bout de bôme
       if (mot) { cloth.setAttribute('d', ''); spar.setAttribute('d', `M${mx} ${my} L${b[0].toFixed(1)} ${b[1].toFixed(1)}`); return; }
-      if (k === 'main') { // grand-voile triangulaire : seule la bôme, la chute arrondie revient en tête de mât
-        const hd = pt(mx, my, L * 0.5, Math.min(115, base + 30)); // haut de la voile, plus ouvert (vrillage)
-        const bm = pt(mx, my, L * 0.85, base + 14);
+      if (k === 'main' || k === 'mainx') { // grand-voile triangulaire : seule la bôme, la chute arrondie revient en tête de mât
+        const mxl = k === 'mainx';
+        const hd = pt(mx, my, L * (mxl ? 0.68 : 0.5), Math.min(115, base + (mxl ? 44 : 30))); // haut de la voile, plus ouvert (vrillage)
+        const bm = pt(mx, my, L * (mxl ? 1.05 : 0.85), base + (mxl ? 28 : 14));
         cloth.setAttribute('d', `M${mx} ${my} L${b[0].toFixed(1)} ${b[1].toFixed(1)} Q${bm[0].toFixed(1)} ${bm[1].toFixed(1)} ${hd[0].toFixed(1)} ${hd[1].toFixed(1)} Z`);
         spar.setAttribute('d', `M${mx} ${my} L${b[0].toFixed(1)} ${b[1].toFixed(1)}`);
         return;
@@ -3628,7 +3633,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=177`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=178`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
