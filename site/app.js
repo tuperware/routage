@@ -5,11 +5,11 @@
   // ---------- Modèles ----------
   const MODELS = [
     { id: 'ecmwf_ifs', name: 'ECMWF', note: 'IFS 9 km, 15 jours', days: 15, wave: ['ecmwf_wam', 'ECMWF WAM'] },
-    { id: 'gfs_seamless', name: 'GFS', note: 'NOAA, 16 jours', days: 16, wave: ['ncep_gfswave025', 'GFS Wave'] },
-    { id: 'icon_seamless', name: 'ICON', note: 'DWD, 7 jours', days: 7, wave: ['dwd_ewam', 'DWD EWAM'] },
     { id: 'meteofrance_arome_france_hd', name: 'AROME', note: 'Météo-France 1,5 km, 2 jours', days: 3, fine: true, wave: ['meteofrance_wave', 'MFWAM Météo-France'], area: { s: 37.6, n: 55.3, w: -11.9, e: 15.9 } },
     { id: 'meteofrance_seamless', name: 'ARPEGE', note: 'Météo-France, 4 jours', days: 5, wave: ['meteofrance_wave', 'MFWAM Météo-France'] },
+    { id: 'icon_seamless', name: 'ICON', note: 'DWD, 7 jours', days: 7, wave: ['dwd_ewam', 'DWD EWAM'] },
     { id: 'ukmo_seamless', name: 'UKMO', note: 'Met Office, 7 jours', days: 7 },
+    { id: 'gfs_seamless', name: 'GFS', note: 'NOAA, 16 jours', days: 16, wave: ['ncep_gfswave025', 'GFS Wave'] },
     { id: 'ecmwf_aifs025_single', name: 'AIFS', note: 'ECMWF IA, 15 jours', days: 15, wave: ['ecmwf_wam', 'ECMWF WAM'] },
   ];
   let model = MODELS[0].id;
@@ -3633,7 +3633,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=179`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=180`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
