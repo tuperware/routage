@@ -3571,10 +3571,26 @@
   }
   el('o-save').addEventListener('click', () => saveOpt(true));
   el('o-pk').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
-    if (b.dataset.v === 'x' && !POLARS.x) { el('o-file').click(); return; }
+    if (b.dataset.v === 'x' && !POLARS.x) { el('o-x-pick').hidden = false; return; }
     el('o-pk').dataset.v = b.dataset.v; saveOpt();
   }));
-  el('o-x-change').addEventListener('click', () => el('o-file').click());
+  el('o-x-change').addEventListener('click', () => { el('o-x-pick').hidden = !el('o-x-pick').hidden; });
+  el('o-x-file').addEventListener('click', () => { el('o-x-pick').hidden = true; el('o-file').click(); });
+  // Exemple : polaire Oceanis 43 de la bibliothèque OpenCPN Weather Routing (GPL-3.0)
+  el('o-mono').addEventListener('click', async () => {
+    el('o-x-pick').hidden = true;
+    const msg = el('o-x-msg');
+    try {
+      const r = await fetch('polaires/monocoque_13m_oceanis_43.pol'); if (!r.ok) throw new Error('fichier introuvable');
+      const p = parsePolarText(await r.text());
+      POLARS.x = p; PX_NAME = 'Oceanis 43 exemple';
+      savePx(PX_NAME, p);
+      msg.textContent = `${PX_NAME} : polaire de la bibliothèque OpenCPN.`; msg.classList.remove('err');
+      el('o-pk').dataset.v = 'x'; polKey = ''; saveOpt();
+      { const ib = el('o-ico').querySelector('button[data-v="m"]'); if (ib && OPT.ico !== 'm') ib.click(); }
+      if (last && last.legs) say('Polaire changée : touchez « Calculer la route » pour mettre la route à jour.');
+    } catch (x) { msg.textContent = `Polaire non chargée : ${x.message}`; msg.classList.add('err'); }
+  });
   el('o-file').addEventListener('change', async () => {
     const f = el('o-file').files[0]; el('o-file').value = '';
     if (!f) return;

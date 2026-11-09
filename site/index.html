@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet">
 <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
-<link href="style.css?v=167" rel="stylesheet">
+<link href="style.css?v=168" rel="stylesheet">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -148,6 +148,7 @@
         <p class="pk-now" id="pk-now">Tiki 38 – Chargé</p>
         <div class="seg pk pk3" id="o-pk" data-v="c"><span class="pk-h">Tiki 38</span><button type="button" data-v="c">Chargé</button><button type="button" data-v="l">Léger</button><span class="pk-h pk-xo">Autre bateau</span><button type="button" data-v="x" id="o-x-btn" class="pk-x pk-xo"></button></div>
         <div class="px-row"><button type="button" class="btn" id="o-x-change">+ Importer la polaire d'un autre bateau</button></div>
+        <div class="px-pick" id="o-x-pick" hidden><button type="button" class="btn" id="o-x-file">Choisir un fichier (.pol, .csv, .txt)</button><button type="button" class="btn" id="o-mono">Oceanis 43 exemple</button></div>
         <small class="pk-txt" id="o-pk-txt"></small>
         <p class="px-msg" id="o-x-msg" role="status" aria-live="polite"></p>
         <input type="file" id="o-file" accept=".pol,.csv,.txt,text/plain,text/csv" hidden>
@@ -344,7 +345,7 @@
    <details class="foot-src"><summary>Sources et limites</summary>
     Vent : <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>, 10 m. Vagues : <a href="https://open-meteo.com/en/docs/marine-weather-api" target="_blank" rel="noopener">Open-Meteo Marine</a> (MFWAM Météo-France avec AROME et ARPEGE, ECMWF WAM, GFS Wave, DWD EWAM), hauteur significative, peu fiable près des côtes.
     Côtes : Natural Earth 1:10 m et OpenStreetMap près des côtes. Fonds et dangers : © <a href="https://openwaters.io/charts/seascape" target="_blank" rel="noopener">Open Waters: Seascape</a> (CC BY 4.0), OpenSeaMap. Aide à la préparation : ne remplace pas les cartes marines.
-    Polaire : Tiki 38, chargé ou léger, ou la vôtre.
+    Polaire : Tiki 38, chargé ou léger, Oceanis 43 en exemple (bibliothèque du greffon <a href="https://github.com/rgleason/weather_routing_pi" target="_blank" rel="noopener">Weather Routing d'OpenCPN</a>, GPL-3.0), ou la vôtre.
     <br>Logiciel libre © Tup, licence GPL-3.0 : <a href="sauvegarde/Routage_code_source.zip" download>code source (zip)</a>.
    </details>
    <p class="foot-note">Aide au routage, ne remplace pas les cartes officielles.</p>
@@ -352,8 +353,8 @@
 </aside>
 
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-<script src="polar.js?v=167"></script>
-<script src="reefs.js?v=167"></script>
-<script src="app.js?v=167"></script>
+<script src="polar.js?v=168"></script>
+<script src="reefs.js?v=168"></script>
+<script src="app.js?v=168"></script>
 </body>
 </html>

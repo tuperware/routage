@@ -647,3 +647,5 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 #book tr.manv td { background: #fff3e0; color: #8a4b0f; font-size: 13px; padding-top: 4px; padding-bottom: 4px; text-align: left; }
 #book tr.manv b { color: #b45309; }
 .foot-note { margin: 4px 0 0; font-size: 12px; color: #5b6b7d; }
+.px-pick { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.px-pick .btn { min-height: 48px; width: 100%; }
