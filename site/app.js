@@ -3778,7 +3778,7 @@
       const d = new Date(t.o.at);
       return `<li><div class="tr-txt"><b>${esc(t.o.name || 'Trace')}</b><small>enregistrée le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}${t.o.dist ? ` · ${nf0.format(t.o.dist)} M` : ''}</small></div><button type="button" class="btn tr-open" data-i="${i}">Ouvrir</button><button type="button" class="btn tr-del" data-i="${i}">Supprimer</button></li>`;
     }).join('') : '<li class="tr-empty">Aucune trace enregistrée.</li>';
-    if (!can && !trItems.length) el('tr-msg').textContent = 'Calculez une route, puis revenez ici pour l\'enregistrer.';
+    if (!can && !trItems.length) el('tr-msg').textContent = 'Calculez une route, puis revenez ici pour enregistrer sa trace.';
   }
   async function trOpenSheet() {
     el('tr-msg').textContent = ''; el('tr-msg').classList.remove('err');
