@@ -3690,7 +3690,7 @@
     const out = new Response(new Blob([inflate ? str : new TextEncoder().encode(str)]).stream().pipeThrough(cs));
     return inflate ? out.text() : new Uint8Array(await out.arrayBuffer());
   }
-  async function packRoute(r, name) {
+  async function packRoute(r, name, max = 9000) {
     try {
       if (!r || !r.legs || typeof CompressionStream === 'undefined') return '';
       const K = ['t0', 'h0', 'dist', 'dur', 'dt', 'alt', 'vias', 'model', 'modelId', 'wName', 'snapped', 'coastCut', 'hazCut', 'dmin', 'coastM', 'noWaves', 'useCur'];
@@ -3700,9 +3700,9 @@
       let legs = r.legs, v = '';
       // Points de la feuille de route tels qu'au calcul (la côte précise n'est plus chargée à la réouverture)
       const simp = LEVELS.map(L => simplify(r.legs, L.tol));
-      for (let pass = 0; pass < 6; pass++) {
+      for (let pass = 0; pass < 10; pass++) {
         v = b64u(await zip(JSON.stringify({ ...base, r: { ...base.r, legs: legs.map(leg), simp: legs === r.legs ? simp : null } }, rnd)));
-        if (v.length <= 9000) break;
+        if (v.length <= max) break;
         const L = legs; legs = L.filter((l, i) => i % 2 === 0 || i === L.length - 1 || !!l.mot !== !!(L[i - 1] && L[i - 1].mot) || l.wait);
         v = '';
       }
@@ -3741,18 +3741,13 @@
   }
   clearSavedRoute(); // ancienne « dernière route » gardée à la racine : plus utilisée
 
-  // ---------- Traces : 5 routes au maximum, dans des cookies rangés sous /traces/ ----------
-  // Ces cookies ne sont envoyés qu'aux adresses /traces/ : le site lui-même ne les reçoit pas (limite d'en-tête du serveur).
-  // Lecture par un petit cadre caché ouvert sur /traces/.
-  const TRK = 'tk', TRMAX = 5, TRP = 'Path=/traces/; Secure; SameSite=Lax';
+  // ---------- Traces : 5 routes au maximum, dans des cookies (2 400 caractères au plus par trace) ----------
+  const TRK = 'tk', TRMAX = 5, TRP = 'Path=/; Secure; SameSite=Lax', TRMAXLEN = 2400;
+  // Anciens essais rangés sous /traces/ (le serveur interdit de les relire) : effacés
+  for (let k = 0; k < TRMAX; k++) { for (let i = 0; i < 4; i++) document.cookie = `${TRK}${k}_${i}=; Max-Age=0; Path=/traces/; Secure; SameSite=Lax`; document.cookie = `${TRK}${k}n=; Max-Age=0; Path=/traces/; Secure; SameSite=Lax`; }
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function trCookies() {
-    return new Promise(res => {
-      const f = document.createElement('iframe'); f.hidden = true; f.src = 'traces/index.html?' + Date.now();
-      const done = () => { let c = ''; try { c = f.contentDocument.cookie; } catch (e) {} f.remove(); res(Object.fromEntries(c.split('; ').filter(Boolean).map(x => { const i = x.indexOf('='); return [x.slice(0, i), x.slice(i + 1)]; }))); };
-      f.onload = done; setTimeout(() => { if (f.isConnected) done(); }, 6000);
-      document.body.appendChild(f);
-    });
+    return Promise.resolve(Object.fromEntries(document.cookie.split('; ').filter(Boolean).map(x => { const i = x.indexOf('='); return [x.slice(0, i), x.slice(i + 1)]; })));
   }
   async function trList() {
     const C = await trCookies(), out = [];
@@ -3802,8 +3797,10 @@
     let k = -1; for (let i = 0; i < TRMAX; i++) if (!used.has(i)) { k = i; break; }
     if (k < 0) { msg.textContent = '5 traces au maximum : supprimez-en une pour enregistrer celle-ci.'; msg.classList.add('err'); return; }
     const name = el('tr-name').value.trim().slice(0, 50) || trDefName();
-    const v = await packRoute(last, name);
+    const v = await packRoute(last, name, TRMAXLEN);
     if (!v) { msg.textContent = 'Route non enregistrée.'; msg.classList.add('err'); return; }
+    // Le serveur refuse les pages si les cookies dépassent environ 16 000 caractères : marge gardée
+    if (document.cookie.length + v.length > 14000) { msg.textContent = 'Plus de place sur cet appareil : supprimez une trace.'; msg.classList.add('err'); return; }
     trDel(k);
     const n = Math.ceil(v.length / 3000);
     for (let i = 0; i < n; i++) document.cookie = `${TRK}${k}_${i}=${v.slice(i * 3000, (i + 1) * 3000)}; Max-Age=31536000; ${TRP}`;
