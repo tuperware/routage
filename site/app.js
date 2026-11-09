@@ -1392,6 +1392,8 @@
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
   const scaleCtl = new maplibregl.ScaleControl({ unit: 'nautical' });
+  // Milles notés « M » comme partout ailleurs (et non « nm »)
+  try { new MutationObserver(ms => ms.forEach(m => { const e = m.target.nodeType === 1 ? m.target : m.target.parentElement; if (e && e.classList.contains('maplibregl-ctrl-scale') && /\s*nm$/.test(e.textContent)) e.textContent = e.textContent.replace(/\s*nm$/, '00a0M'); })).observe(document.body, { subtree: true, childList: true, characterData: true }); } catch (e) {}
   map.addControl(scaleCtl, 'bottom-right');
   { // Échelle en mètres quand elle fait moins de 0,5 M
     let u = 'nautical';
@@ -1489,7 +1491,7 @@
     ui.go.disabled = !(start && (end || vias.length));
     el('undo-pt').hidden = !start;
     ui.hint.textContent = !start ? `${PC_WORD.one} la carte pour placer le départ.`
-      : end ? 'Route terminée. Choisissez le modèle, puis calculez.'
+      : end ? 'Points posés. Choisissez le modèle, puis calculez.'
       : `${PC_WORD.one} la carte pour chaque point. Pour l\u2019arrivée : ${PC_WORD.dbl}.`;
     // pendant la construction, le double clic ou double toucher ferme la route au lieu de zoomer
     try { if (start && !end) map.doubleClickZoom.disable(); else map.doubleClickZoom.enable(); } catch (e) {}
@@ -2720,7 +2722,7 @@
       if (r.error && r.rej) {
         // Message précis : quelle limite bloque, et quelle valeur essayer
         const R = r.rej, w0 = windAt(S0[r.seg || 0].p.lat, S0[r.seg || 0].p.lon, hh), v0 = waveAt(S0[r.seg || 0].p.lat, S0[r.seg || 0].p.lon, hh);
-        const here = `Au départ : vent ${w0 ? nf0.format(w0.tws) + ' nds' : 'n. d.'}${v0 ? `, vagues ${nf1.format(v0.hs)} m` : ''}.`;
+        const here = `Au départ : vent ${w0 ? nf0.format(w0.tws) + ' nds' : '–'}${v0 ? `, vagues ${nf1.format(v0.hs)} m` : ''}.`;
         if (R.wave > 0 && R.wave >= R.wind) {
           const need = Math.ceil(Math.max(R.waveMin, v0 ? v0.hs : 0) * 2) / 2 + 0.5;
           throw new Error(segTxt + `Bloqué par les vagues : elles dépassent votre maximum de ${nf1.format(OPT.hmax)} m. ${here} Montez « Vagues max » à ${nf1.format(need)} m environ (Réglages bateau), ou partez plus tard.`);
@@ -3062,7 +3064,7 @@
     rg.hidden = !(guMax > OPT.wmax);
     if (guMax > OPT.wmax) rg.innerHTML = `<b>Rafales jusqu'à ${nf0.format(guMax)} nds</b> ${dfmt.format(timeAt(guH))}, au-dessus de votre vent max (${nf0.format(OPT.wmax)} nds).`;
     const hsArr = r.legs.filter(n => n.wv).map(n => n.wv.hs);
-    el('r-wave').textContent = hsArr.length ? `${nf1.format(Math.max(...hsArr))} m` : 'n. d.';
+    el('r-wave').textContent = hsArr.length ? `${nf1.format(Math.max(...hsArr))} m` : '–';
     let motH = 0, waitH = 0;
     for (let i = 0; i < r.legs.length - 1; i++) if (r.legs[i].wait) waitH += r.legs[i + 1].h - r.legs[i].h;
     for (let i = 0; i < r.legs.length - 1; i++) if (r.legs[i].mot) motH += r.legs[i + 1].h - r.legs[i].h;
@@ -3093,7 +3095,7 @@
     sizeBoat();
     scrub();
     ui.result.hidden = false;
-    panel.classList.add('has-result');
+    panel.classList.add('has-result'); ui.hint.textContent = 'Route calculée.';
     el('wave-toggle').hidden = !!r.noWaves;
     el('peek').innerHTML = `${fmtDur(r.dur)} · arrivée ${hfmt.format(timeAt(r.h0 + r.dur))} · ${distTxt(r.dist)}<small>${r.model}${r.noWaves ? '' : ` · vagues max ${el('r-wave').textContent}`}${r.vias ? ` · ${r.vias} point${r.vias > 1 ? 's' : ''} de passage` : ''}${motH > 0 ? ` · moteur ${fmtDur(motH)}` : ''}${waitH > 0 ? ` · attente ${fmtDur(waitH)}` : ''}${r.alt ? `<br>Sans attente : arrivée ${hfmt.format(timeAt(r.alt.h))}, vagues jusqu'à ${nf1.format(r.alt.hs)} m` : ''}</small>`;
     setSheet(false);
@@ -3451,9 +3453,9 @@
       const sv = a.mot ? null : sailFor(twa, a.tws);
       set('now-sail', a.mot ? 'Moteur' : sv ? sailTxt(sv) : '–');
       const wv = waveAt(pos.lat, pos.lon, h) || (last && last.saved ? a.wv : null);
-      set('now-wave', wv ? `${nf1.format(wv.hs)} m du ${nf0.format(wv.dir)}°, période ${nf0.format(wv.tp)} s` : 'pas de donnée');
+      set('now-wave', wv ? `${nf1.format(wv.hs)} m du ${nf0.format(wv.dir)}°, période ${nf0.format(wv.tp)} s` : '–');
       const cw = curAt(pos.lat, pos.lon, h);
-      set('now-cur', cw ? `${nf1.format(cw.sp)} nds vers ${nf0.format(cw.dir)}°${nearCoast(pos.lat, pos.lon) ? ' · près des côtes : peu fiable' : ''}` : 'pas de donnée');
+      set('now-cur', cw ? `${nf1.format(cw.sp)} nds vers ${nf0.format(cw.dir)}°${nearCoast(pos.lat, pos.lon) ? ' · près des côtes : peu fiable' : ''}` : '–');
     } else { set('now-time', `${dfmt.format(timeAt(h))} · arrivée`); ['now-hdg','now-bsp','now-tws','now-twa','now-wave','now-sail','now-cur'].forEach(i => set(i, '–')); }
   }
   ui.scrub.addEventListener('input', scrub);
@@ -3505,10 +3507,10 @@
     el('pk-now').textContent = OPT.pk === 'x' ? PX_NAME : `Tiki 38 – ${OPT.pk === 'l' ? 'Léger' : 'Chargé'}`;
     document.body.classList.toggle('has-px', !!POLARS.x);
     { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
-    el('pol-leg').textContent = other ? `Trait plein : votre polaire. Pointillés : ${PX_NAME} d'origine. Vitesses en nœuds.` : 'Trait plein : votre polaire. Pointillés : Chargé d\u2019origine. Vitesses en nœuds.';
+    el('pol-leg').textContent = other ? `Trait plein : votre polaire. Pointillés : polaire d'origine. Vitesses en nœuds.` : 'Trait plein : votre polaire. Pointillés : polaire d\u2019origine. Vitesses en nœuds.';
     if (other && el('result').dataset.tab === 'voile') setTab('resume');
     P = POLARS[key] || POLARS[OPT.pk];
-    if (polKey && polKey !== key && last && last.legs) say('Polaire changée : touchez « Calculer la route » pour mettre la route à jour.');
+    if (polKey && polKey !== key && last && last.legs) say('Polaire changée : touchez « Relancer » pour mettre la route à jour.');
     polKey = key;
     el('o-pk').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === OPT.pk)));
     drawPolar();
@@ -3570,8 +3572,8 @@
     el('o-note').hidden = ok;
     if (manual === true) {
       const b = el('o-save');
-      b.textContent = ok ? 'Enregistré' : 'Enregistré dans le lien'; b.classList.add('ok');
-      setTimeout(() => { b.textContent = 'Enregistrer'; b.classList.remove('ok'); }, 2000);
+      b.textContent = ok ? 'Réglages gardés' : 'Réglages gardés dans le lien'; b.classList.add('ok');
+      setTimeout(() => { b.textContent = 'Garder les réglages'; b.classList.remove('ok'); }, 2000);
     }
   }
   el('o-save').addEventListener('click', () => saveOpt(true));
@@ -3593,7 +3595,7 @@
       msg.textContent = `${PX_NAME} : polaire de la bibliothèque OpenCPN.`; msg.classList.remove('err');
       el('o-pk').dataset.v = 'x'; polKey = ''; saveOpt();
       { const ib = el('o-ico').querySelector('button[data-v="m"]'); if (ib && OPT.ico !== 'm') ib.click(); }
-      if (last && last.legs) say('Polaire changée : touchez « Calculer la route » pour mettre la route à jour.');
+      if (last && last.legs) say('Polaire changée : touchez « Relancer » pour mettre la route à jour.');
     } catch (x) { msg.textContent = `Polaire non chargée : ${x.message}`; msg.classList.add('err'); }
   });
   el('o-file').addEventListener('change', async () => {
@@ -3608,7 +3610,7 @@
       msg.textContent = `${PX_NAME} : ${p.twa.length} angles, vents jusqu'à ${nf0.format(p.tws[p.tws.length - 1])} nds.${ok ? '' : ' Polaire trop grande pour être gardée : à réimporter au prochain lancement.'}`;
       msg.classList.remove('err');
       el('o-pk').dataset.v = 'x'; polKey = ''; saveOpt();
-      if (last && last.legs) say('Polaire changée : touchez « Calculer la route » pour mettre la route à jour.');
+      if (last && last.legs) say('Polaire changée : touchez « Relancer » pour mettre la route à jour.');
     } catch (e) {
       msg.textContent = `Polaire non lue : ${e.message}`; msg.classList.add('err');
     }
@@ -3895,8 +3897,8 @@
     }
     // « Enregistrer » : téléchargement direct, rien d'autre
     downloadGpx();
-    const b = el('gpx'); b.innerHTML = 'Enregistré<small>GPX</small>';
-    clearTimeout(exportGpx.t); exportGpx.t = setTimeout(() => { b.innerHTML = 'Enregistrer<small>GPX</small>'; }, 3000);
+    const b = el('gpx'); b.innerHTML = 'Exporté<small>GPX</small>';
+    clearTimeout(exportGpx.t); exportGpx.t = setTimeout(() => { b.innerHTML = 'Exporter<small>GPX</small>'; }, 3000);
   }
   el('gpx-dl').addEventListener('click', downloadGpx);
   el('gpx-share').addEventListener('click', shareGpx);

@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet">
 <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
-<link href="style.css?v=175" rel="stylesheet">
+<link href="style.css?v=176" rel="stylesheet">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -148,7 +148,7 @@
     <summary><span>Réglages bateau</span><span class="set-sum" id="set-sum"></span></summary>
     <div class="set-body">
       <div class="set-row col">
-        <span><b>Polaire de base</b></span>
+        <span><b>Polaire d'origine</b></span>
         <p class="pk-now" id="pk-now">Tiki 38 – Chargé</p>
         <div class="seg pk pk3" id="o-pk" data-v="c"><span class="pk-h">Tiki 38</span><button type="button" data-v="c">Chargé</button><button type="button" data-v="l">Léger</button><span class="pk-h pk-xo">Autre bateau</span><button type="button" data-v="x" id="o-x-btn" class="pk-x pk-xo"></button></div>
         <div class="px-row"><button type="button" class="btn" id="o-x-change">+ Importer la polaire d'un autre bateau</button></div>
@@ -172,7 +172,7 @@
           <figcaption>
             <span><i class="sw" style="background:#7fa7c4"></i>6 nds</span><span><i class="sw" style="background:#1f5f8b"></i>10 nds</span>
             <span><i class="sw" style="background:#d98a00"></i>16 nds</span><span><i class="sw" style="background:#b8322a"></i>25 nds</span>
-            <span class="small" id="pol-leg">Trait plein : votre polaire. Pointillés : Chargé d'origine. Vitesses en nœuds.</span>
+            <span class="small" id="pol-leg">Trait plein : votre polaire. Pointillés : polaire d'origine. Vitesses en nœuds.</span>
           </figcaption>
         </figure>
         <button type="button" class="btn" id="o-reset">Revenir à la polaire d'origine</button>
@@ -190,11 +190,11 @@
         <div class="seg pk" id="o-cur" data-v="1"><button type="button" data-v="1">Avec courant</button><button type="button" data-v="0">Sans courant</button></div>
       </div>
       <div class="set-row col spi-set">
-        <span><b>Spi à bord</b><small>Sans spi : polaire sans spi (gréement de route 54,6 m² à toutes les allures), plus lente au portant. <a href="polaires/tiki38_charge_sans_spi.pol" download>Fichier .pol</a></small></span>
+        <span><b>Spi à bord</b><small>Sans spi : polaire sans spi (gréement de route 54,6 m² à toutes les allures), plus lente au portant. <a href="polaires/tiki38_charge_sans_spi.pol" download>Télécharger la polaire (.pol)</a></small></span>
         <div class="seg pk" id="o-spi" data-v="1"><button type="button" data-v="1">Avec spi</button><button type="button" data-v="0">Sans spi</button></div>
       </div>
       <label class="set-row spi-row">
-        <span><b>Spi (light) jusqu'à</b><small>Au-delà, le plan de voilure conseille le plein 54,6 m². Votre choix : ce seuil n'est pas sur les plans</small></span>
+        <span><b>Spi (light) jusqu'à</b><small>Au-delà, le plan de voilure conseille le plein 54,6 m². Votre choix, hors plans</small></span>
         <span class="num"><input type="number" id="o-cx" min="5" max="40" step="1" value="20" inputmode="numeric"><i>nds</i></span>
       </label>
       <label class="set-row">
@@ -225,16 +225,16 @@
         <span><b>Moteur face au vent jusqu'à</b><small>Au-delà, pas de moteur à moins de 60° du vent (mer de face). Votre choix, hors plans</small></span>
         <span class="num"><input type="number" id="o-engw" min="0" max="60" step="1" value="15" inputmode="decimal"><i>nds</i></span>
       </label>
-      <button type="button" class="btn-save" id="o-save">Enregistrer</button>
+      <button type="button" class="btn-save" id="o-save">Garder les réglages</button>
       <p class="small" id="o-note" hidden>Ce navigateur ne garde pas les réglages. Ouvrez la page dans Chrome, ou ajoutez-la à l'écran d'accueil (menu ⋮ › « Ajouter à l'écran d'accueil ») : l'icône garde vos réglages.</p>
     </div>
   </details>
 
   <div class="go-row">
     <button class="btn-primary" id="go" disabled>Calculer la route</button>
-    <button class="btn btn-reset" id="reset-top" type="button" aria-label="Effacer et refaire un routage" title="Effacer et refaire un routage">
+    <button class="btn btn-reset" id="reset-top" type="button" aria-label="Effacer la route" title="Effacer la route">
       <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span>Reset</span>
+      <span>Effacer</span>
     </button>
   </div>
   <button class="btn btn-cmp" id="cmp-jump" type="button">
@@ -245,10 +245,10 @@
   <section class="result" id="result" data-tab="resume" hidden>
     <div class="quick" id="quick">
       <button type="button" class="q-btn q-main" id="wp-less"><span id="wp-less-t">Nettoyer</span><small id="wp-count"></small></button>
-      <button type="button" class="q-btn" id="wp-more">Annuler</button>
-      <button type="button" class="q-btn q-gpx" id="gpx">Enregistrer<small>GPX</small></button>
+      <button type="button" class="q-btn" id="wp-more">Plus de points</button>
+      <button type="button" class="q-btn q-gpx" id="gpx">Exporter<small>GPX</small></button>
       <button type="button" class="q-btn q-share" id="q-share" hidden aria-label="Partager le GPX"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="18" cy="5" r="2.6" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="6" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="18" cy="19" r="2.6" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M8.3 10.8l7.4-4.4M8.3 13.2l7.4 4.4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><small>Partager</small></button>
-      <button type="button" class="q-btn q-reset" id="q-reset" aria-label="Reset : effacer la route"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><small>Reset</small></button>
+      <button type="button" class="q-btn q-reset" id="q-reset" aria-label="Effacer la route"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><small>Effacer</small></button>
     </div>
     <div id="gpx-help" hidden><span id="gpx-name"></span><button id="gpx-dl" type="button"></button><p id="gpx-ok"></p><button id="gpx-share" type="button"></button><p id="gpx-send"></p><button id="gpx-copy" type="button"></button></div>
 
@@ -311,17 +311,18 @@
       <div id="cmp-out"></div>
     </details>
     <div class="actions">
-      <button class="btn" id="reset">Recommencer</button>
+      <button class="btn" id="reset">Effacer</button>
     </div>
     </div>
     <div class="pane" data-pane="route">
     <div class="book">
       <div class="table-wrap">
         <table>
-          <thead><tr><th>N°</th><th>Heure</th><th id="th-cap">Cap</th><th>Dist.<br>M</th><th>Vent<br>nds</th><th>Vagues<br>m</th><th>Angle</th><th>Vit.<br>nds</th><th id="th-cur" hidden>Cour.<br>nds</th></tr></thead>
+          <thead><tr><th>N°</th><th>Heure</th><th id="th-cap">Cap</th><th>Dist.<br>M</th><th>Vent<br>nds</th><th>Vagues<br>m</th><th>Allure</th><th>Vit.<br>nds</th><th id="th-cur" hidden>Cour.<br>nds</th></tr></thead>
           <tbody id="book"></tbody>
         </table>
       </div>
+      <p class="book-note rb-key">Td = tribord amures · Bd = bâbord amures.</p>
       <p class="book-note" id="book-cur" hidden></p>
       <p class="book-note" id="book-note" hidden></p>
     </div>
@@ -342,7 +343,7 @@
 
   <div class="install" id="install-box">
     <button type="button" class="btn-save" id="install" hidden>Installer l'icône sur l'écran d'accueil</button>
-    <p class="small" id="install-hint">Pour avoir l'app en plein écran : dans Chrome, menu ⋮ › « Ajouter à l'écran d'accueil » (ou « Installer l'application »).</p>
+    <p class="small" id="install-hint">Pour avoir l'application en plein écran : dans Chrome, menu ⋮ › « Ajouter à l'écran d'accueil » (ou « Installer l'application »).</p>
   </div>
 
   <footer class="foot">
@@ -357,8 +358,8 @@
 </aside>
 
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-<script src="polar.js?v=175"></script>
-<script src="reefs.js?v=175"></script>
+<script src="polar.js?v=176"></script>
+<script src="reefs.js?v=176"></script>
 <div class="tr-back" id="tr-back" hidden>
  <div class="tr-sheet" role="dialog" aria-modal="true" aria-labelledby="tr-title">
   <div class="tr-head"><h2 id="tr-title">Traces</h2><button type="button" class="btn tr-x" id="tr-close" aria-label="Fermer">Fermer</button></div>
@@ -372,6 +373,6 @@
   <p class="tr-note">5 traces au maximum, gardées sur cet appareil.</p>
  </div>
 </div>
-<script src="app.js?v=175"></script>
+<script src="app.js?v=176"></script>
 </body>
 </html>
