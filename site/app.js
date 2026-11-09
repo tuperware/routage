@@ -3766,7 +3766,7 @@
   function trDefName() {
     const r = last; if (!r) return '';
     const d = timeAt(r.h0);
-    return `Route du ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${nf0.format(r.dist)} M`;
+    return `Trace du ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${nf0.format(r.dist)} M`;
   }
   let trItems = [];
   async function trRender() {
@@ -3798,7 +3798,7 @@
     if (k < 0) { msg.textContent = '5 traces au maximum : supprimez-en une pour enregistrer celle-ci.'; msg.classList.add('err'); return; }
     const name = el('tr-name').value.trim().slice(0, 50) || trDefName();
     const v = await packTrace(last, name, TRMAXLEN);
-    if (!v) { msg.textContent = 'Route non enregistrée.'; msg.classList.add('err'); return; }
+    if (!v) { msg.textContent = 'Trace non enregistrée.'; msg.classList.add('err'); return; }
     // Le serveur refuse les pages si les cookies dépassent environ 16 000 caractères : marge gardée
     if (document.cookie.length + v.length > 14000) { msg.textContent = 'Plus de place sur cet appareil : supprimez une trace.'; msg.classList.add('err'); return; }
     trDel(k);
@@ -3806,7 +3806,7 @@
     for (let i = 0; i < n; i++) document.cookie = `${TRK}${k}_${i}=${v.slice(i * 3000, (i + 1) * 3000)}; Max-Age=31536000; ${TRP}`;
     document.cookie = `${TRK}${k}n=${n}; Max-Age=31536000; ${TRP}`;
     await trRender();
-    msg.textContent = trItems.some(t => t.k === k) ? `« ${name} » enregistrée.` : 'Route non enregistrée.';
+    msg.textContent = trItems.some(t => t.k === k) ? `« ${name} » enregistrée.` : 'Trace non enregistrée.';
   });
   el('tr-list').addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
