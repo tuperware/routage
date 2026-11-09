@@ -3748,7 +3748,7 @@
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function trCookies() {
     return new Promise(res => {
-      const f = document.createElement('iframe'); f.hidden = true; f.src = 'traces/?' + Date.now();
+      const f = document.createElement('iframe'); f.hidden = true; f.src = 'traces/index.html?' + Date.now();
       const done = () => { let c = ''; try { c = f.contentDocument.cookie; } catch (e) {} f.remove(); res(Object.fromEntries(c.split('; ').filter(Boolean).map(x => { const i = x.indexOf('='); return [x.slice(0, i), x.slice(i + 1)]; }))); };
       f.onload = done; setTimeout(() => { if (f.isConnected) done(); }, 6000);
       document.body.appendChild(f);
