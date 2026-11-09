@@ -2736,7 +2736,7 @@
   el('r-tstart').addEventListener('input', () => { if (el('r-tstart').value) ui.tStart.value = el('r-tstart').value; });
   el('r-go').addEventListener('click', () => { if (el('r-tstart').value) ui.tStart.value = el('r-tstart').value; if (wxOn) wxClose(true); runMain(); });
   async function runMain() {
-    readOpt();
+    readOpt(); clearTraceLine();
     if (!start || !end) return;
     ui.go.disabled = true; ui.go.setAttribute('aria-busy', 'true');
     clearResult();
@@ -3662,7 +3662,7 @@
   el('reset').addEventListener('click', () => {
     el('gpx-help').hidden = true;
     if (wxOn) wxClose(true); // Reset : on quitte aussi le mode Météo
-    clearResult();
+    clearResult(); clearTraceLine();
     // Plus rien du grib à l'écran : vent, vagues, courant
     wind = null; waves = null; currents = null;
     ['wind', 'wave-dirs', 'cur-dirs'].forEach(id => map.getSource(id) && map.getSource(id).setData(EMPTY));
@@ -3690,52 +3690,46 @@
     const out = new Response(new Blob([inflate ? str : new TextEncoder().encode(str)]).stream().pipeThrough(cs));
     return inflate ? out.text() : new Uint8Array(await out.arrayBuffer());
   }
-  async function packRoute(r, name, max = 9000) {
+  // Trace seule : les points posés et le tracé, sans la météo du calcul
+  async function packTrace(r, name, max) {
     try {
       if (!r || !r.legs || typeof CompressionStream === 'undefined') return '';
-      const K = ['t0', 'h0', 'dist', 'dur', 'dt', 'alt', 'vias', 'model', 'modelId', 'wName', 'snapped', 'coastCut', 'hazCut', 'dmin', 'coastM', 'noWaves', 'useCur'];
-      const base = { v: 1, name, ts: ui.tStart.value, at: r.at || Date.now(), pts: [start, ...vias.map(v => v.p), end].map(p => [p.lat, p.lon]), r: Object.fromEntries(K.map(k => [k, r[k]])) };
-      const leg = l => { const o = {}; for (const k in l) if (l[k] != null && l[k] !== false && typeof l[k] !== 'function') o[k] = l[k]; return o; };
-      const rnd = (k, v) => (typeof v === 'number' ? Math.round(v * 1e5) / 1e5 : v);
-      let legs = r.legs, v = '';
-      // Points de la feuille de route tels qu'au calcul (la côte précise n'est plus chargée à la réouverture)
-      const simp = LEVELS.map(L => simplify(r.legs, L.tol));
+      const pts = [start, ...vias.map(v => v.p), end].map(p => [Math.round(p.lat * 1e5) / 1e5, Math.round(p.lon * 1e5) / 1e5]);
+      let L = r.legs.map(l => [l.lat, l.lon]), v = '';
       for (let pass = 0; pass < 10; pass++) {
-        v = b64u(await zip(JSON.stringify({ ...base, r: { ...base.r, legs: legs.map(leg), simp: legs === r.legs ? simp : null } }, rnd)));
+        let pa = 0, po = 0; const d = [];
+        L.forEach(q => { const x = Math.round(q[0] * 1e4), y = Math.round(q[1] * 1e4); d.push(x - pa, y - po); pa = x; po = y; });
+        v = b64u(await zip(JSON.stringify({ v: 2, name, at: Date.now(), dist: Math.round(r.dist * 10) / 10, pts, d })));
         if (v.length <= max) break;
-        const L = legs; legs = L.filter((l, i) => i % 2 === 0 || i === L.length - 1 || !!l.mot !== !!(L[i - 1] && L[i - 1].mot) || l.wait);
-        v = '';
+        const M = L; L = M.filter((_, i) => i % 2 === 0 || i === M.length - 1); v = '';
       }
       return v;
     } catch (e) { return ''; }
   }
+  function traceLine(o) {
+    if (o.v === 2 && o.d) { const out = []; let a = 0, b = 0; for (let i = 0; i + 1 < o.d.length; i += 2) { a += o.d[i]; b += o.d[i + 1]; out.push([b / 1e4, a / 1e4]); } return out; }
+    if (o.r && o.r.legs) return o.r.legs.map(l => [l.lon, l.lat]);
+    return null;
+  }
+  function clearTraceLine() { const s = map.getSource('trace-saved'); if (s) s.setData(EMPTY); }
   async function openRoute(o) {
     try {
-      if (!o || o.v !== 1 || !o.pts || o.pts.length < 2 || !o.r || !o.r.legs || o.r.legs.length < 2) return false;
+      const line = o && traceLine(o);
+      if (!o || !o.pts || o.pts.length < 2 || !line || line.length < 2) return false;
       el('reset').click();
       const P = o.pts;
       setPoint('start', { lat: P[0][0], lng: P[0][1] });
       P.slice(1, -1).forEach(q => addVia({ lat: q[0], lon: q[1] }));
       setPoint('end', { lat: P[P.length - 1][0], lng: P[P.length - 1][1] });
-      o.r.legs.forEach(l => { for (const k of ['hdg', 'tws', 'twd', 'bsp', 'wv', 'cog', 'sog', 'cu']) if (l[k] === undefined) l[k] = null; l.mot = !!l.mot; });
-      if (o.ts) { ui.tStart.value = o.ts; tStartSet = true; }
-      // Côtes autour de la route (pour la feuille de route : mêmes points que lors du calcul)
-      try {
-        const la = o.r.legs.map(l => l.lat), lo = o.r.legs.map(l => l.lon), mg = 0.3;
-        await loadMasks({ s: Math.min(...la) - mg, n: Math.max(...la) + mg, w: Math.min(...lo) - mg, e: Math.max(...lo) + mg });
-        fineOn = true; coastM = o.r.coastM != null ? o.r.coastM : OPT.coast; coastNear = P.map(q => ({ lat: q[0], lon: q[1] }));
-        await loadFineKeys(fineKeysAlong(o.r.legs));
-      } catch (e) {}
-      last = { ...o.r, saved: true, at: o.at };
-      showResult();
-      const b = map.getBounds(), L = last.legs;
-      const bb = L.reduce((a, l) => [Math.min(a[0], l.lon), Math.min(a[1], l.lat), Math.max(a[2], l.lon), Math.max(a[3], l.lat)], [180, 90, -180, -90]);
-      void b;
+      const geo = { type: 'Feature', geometry: { type: 'LineString', coordinates: line }, properties: {} };
+      if (!map.getSource('trace-saved')) {
+        map.addSource('trace-saved', { type: 'geojson', data: geo });
+        map.addLayer({ id: 'trace-saved', type: 'line', source: 'trace-saved', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#b8322a', 'line-width': 3.5, 'line-opacity': 0.75 } });
+      } else map.getSource('trace-saved').setData(geo);
+      const bb = line.reduce((a, q) => [Math.min(a[0], q[0]), Math.min(a[1], q[1]), Math.max(a[2], q[0]), Math.max(a[3], q[1])], [180, 90, -180, -90]);
       const ph = isMobile() ? panel.getBoundingClientRect().height : 0, pw = !isMobile() ? panel.getBoundingClientRect().right : 0;
       map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: { top: 70, bottom: Math.min(ph + 30, innerHeight * 0.6), left: pw + 60, right: 100 }, duration: 0, maxZoom: 13 });
-      const d = new Date(o.at), dt = `${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
-      el('peek').insertAdjacentHTML('beforeend', `<small>${esc(o.name || 'Trace')} · calculée le ${dt}</small>`);
-      say(`« ${o.name || 'Trace'} », calculée le ${dt} avec la météo de ce moment-là. Touchez « Relancer » pour la mettre à jour.`);
+      say(`« ${o.name || 'Trace'} »${o.dist ? ` · ${nf0.format(o.dist)} M` : ''}. Touchez « Calculer la route » pour la calculer avec la météo actuelle.`);
       return true;
     } catch (e) { return false; }
   }
@@ -3776,7 +3770,7 @@
     const ul = el('tr-list');
     ul.innerHTML = trItems.length ? trItems.map((t, i) => {
       const d = new Date(t.o.at);
-      return `<li><div class="tr-txt"><b>${esc(t.o.name || 'Trace')}</b><small>calculée le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</small></div><button type="button" class="btn tr-open" data-i="${i}">Ouvrir</button><button type="button" class="btn tr-del" data-i="${i}">Supprimer</button></li>`;
+      return `<li><div class="tr-txt"><b>${esc(t.o.name || 'Trace')}</b><small>enregistrée le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}${t.o.dist ? ` · ${nf0.format(t.o.dist)} M` : ''}</small></div><button type="button" class="btn tr-open" data-i="${i}">Ouvrir</button><button type="button" class="btn tr-del" data-i="${i}">Supprimer</button></li>`;
     }).join('') : '<li class="tr-empty">Aucune trace enregistrée.</li>';
     if (!can && !trItems.length) el('tr-msg').textContent = 'Calculez une route, puis revenez ici pour l\'enregistrer.';
   }
@@ -3797,7 +3791,7 @@
     let k = -1; for (let i = 0; i < TRMAX; i++) if (!used.has(i)) { k = i; break; }
     if (k < 0) { msg.textContent = '5 traces au maximum : supprimez-en une pour enregistrer celle-ci.'; msg.classList.add('err'); return; }
     const name = el('tr-name').value.trim().slice(0, 50) || trDefName();
-    const v = await packRoute(last, name, TRMAXLEN);
+    const v = await packTrace(last, name, TRMAXLEN);
     if (!v) { msg.textContent = 'Route non enregistrée.'; msg.classList.add('err'); return; }
     // Le serveur refuse les pages si les cookies dépassent environ 16 000 caractères : marge gardée
     if (document.cookie.length + v.length > 14000) { msg.textContent = 'Plus de place sur cet appareil : supprimez une trace.'; msg.classList.add('err'); return; }
