@@ -802,6 +802,9 @@
     return m[Math.min(N - 1, Math.floor((ty + TILE - lat) * MASK_RES)) * N + Math.min(N - 1, Math.floor((lon - tx) * MASK_RES))] === 1;
   }
 
+  // Open-Meteo refuse les longitudes hors de -180..180 (grille élargie au-delà de l'antiméridien)
+  const wrapLon = l => +((((l + 180) % 360) + 360) % 360 - 180).toFixed(3);
+  const clampLat = l => Math.max(-89.9, Math.min(89.9, l));
   // ---------- Vent Open-Meteo ----------
   let wind = null; // {lats, lons, t0, times(h), u, v, nx, ny, nt}
 
@@ -826,8 +829,8 @@
     async function get(ci) {
       const c = chunks[ci];
       const url = 'https://api.open-meteo.com/v1/forecast'
-        + `?latitude=${c.map(p => p[0]).join(',')}`
-        + `&longitude=${c.map(p => p[1]).join(',')}`
+        + `?latitude=${c.map(p => clampLat(p[0])).join(',')}`
+        + `&longitude=${c.map(p => wrapLon(p[1])).join(',')}`
         + `&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kn`
         + `&models=${modelId}&forecast_days=${days}&timezone=UTC&cell_selection=sea`;
       const j = await omJson(url);
@@ -918,7 +921,7 @@
     async function get(ci) {
       const c = chunks[ci];
       const url = 'https://marine-api.open-meteo.com/v1/marine'
-        + `?latitude=${c.map(p => p[0]).join(',')}&longitude=${c.map(p => p[1]).join(',')}`
+        + `?latitude=${c.map(p => clampLat(p[0])).join(',')}&longitude=${c.map(p => wrapLon(p[1])).join(',')}`
         + `&hourly=wave_height,wave_direction,wave_period&forecast_days=${Math.min(16, days)}&timezone=UTC&cell_selection=sea${wm ? `&models=${wm}` : ''}`;
       const j = await omJson(url);
       results[ci] = Array.isArray(j) ? j : [j];
@@ -982,7 +985,7 @@
     async function get(ci) {
       const c = chunks[ci];
       const url = 'https://marine-api.open-meteo.com/v1/marine'
-        + `?latitude=${c.map(p => p[0]).join(',')}&longitude=${c.map(p => p[1]).join(',')}`
+        + `?latitude=${c.map(p => clampLat(p[0])).join(',')}&longitude=${c.map(p => wrapLon(p[1])).join(',')}`
         + `&hourly=ocean_current_velocity,ocean_current_direction&forecast_days=${nd}&timezone=UTC&cell_selection=sea`;
       const j = await omJson(url);
       results[ci] = Array.isArray(j) ? j : [j];
