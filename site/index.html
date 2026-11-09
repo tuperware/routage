@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet">
 <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
-<link href="style.css?v=168" rel="stylesheet">
+<link href="style.css?v=169" rel="stylesheet">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -69,6 +69,10 @@
   <button type="button" class="fab-btn" id="chart-btn" aria-pressed="false" aria-label="Afficher la carte marine">
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v15M8 9h8M5 13a7 7 0 0 0 14 0M12 5a1.8 1.8 0 1 0 0-.01" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="3.8" r="1.8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
     <span>Carte</span>
+  </button>
+  <button type="button" class="fab-btn" id="trace-btn" aria-pressed="false" aria-label="Traces enregistrées">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 3h11l3 3v15H5z M8 3v6h8V3 M8 21v-7h8v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+    <span>Traces</span>
   </button>
   <button type="button" class="fab-btn" id="gps-btn" hidden aria-pressed="false" aria-label="Ma position GPS">
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -353,8 +357,21 @@
 </aside>
 
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-<script src="polar.js?v=168"></script>
-<script src="reefs.js?v=168"></script>
-<script src="app.js?v=168"></script>
+<script src="polar.js?v=169"></script>
+<script src="reefs.js?v=169"></script>
+<div class="tr-back" id="tr-back" hidden>
+ <div class="tr-sheet" role="dialog" aria-modal="true" aria-labelledby="tr-title">
+  <div class="tr-head"><h2 id="tr-title">Traces</h2><button type="button" class="btn tr-x" id="tr-close" aria-label="Fermer">Fermer</button></div>
+  <div class="tr-save" id="tr-save">
+   <label for="tr-name">Nom de la route</label>
+   <input type="text" id="tr-name" maxlength="50" autocomplete="off">
+   <button type="button" class="btn-primary" id="tr-save-btn">Enregistrer cette route</button>
+  </div>
+  <p class="tr-msg" id="tr-msg" role="status" aria-live="polite"></p>
+  <ul class="tr-list" id="tr-list"></ul>
+  <p class="tr-note">5 traces au maximum, gardées sur cet appareil.</p>
+ </div>
+</div>
+<script src="app.js?v=169"></script>
 </body>
 </html>

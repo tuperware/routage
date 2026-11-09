@@ -649,3 +649,26 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 .foot-note { margin: 4px 0 0; font-size: 12px; color: #5b6b7d; }
 .px-pick { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .px-pick .btn { min-height: 48px; width: 100%; }
+/* Traces */
+.tr-back { position: fixed; inset: 0; z-index: 60; background: rgba(20, 30, 40, .35); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.tr-back[hidden] { display: none; }
+.tr-sheet { background: #fbf8f2; border-radius: 16px; width: min(460px, 100%); max-height: 88vh; overflow: auto; padding: 16px; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.tr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.tr-head h2 { margin: 0; font-size: 20px; }
+.tr-x { min-height: 44px; padding: 0 16px; }
+.tr-save { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.tr-save[hidden] { display: none; }
+.tr-save label { font-size: var(--text-xs); color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.tr-save input { min-height: 48px; font-size: 16px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.tr-save .btn-primary { min-height: 52px; width: 100%; }
+.tr-msg { margin: 8px 0 0; font-size: 14px; min-height: 0; }
+.tr-msg.err { color: #b3261e; }
+.tr-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tr-list li { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.tr-list li.tr-empty { display: block; color: var(--muted); border: 0; }
+.tr-txt b { display: block; font-size: 15px; word-break: break-word; }
+.tr-txt small { color: var(--muted); font-size: 12px; }
+.tr-list .btn { min-height: 48px; padding: 0 12px; }
+.tr-del { color: #b3261e; }
+.tr-note { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+@media (max-width: 420px) { .tr-list li { grid-template-columns: 1fr 1fr; } .tr-txt { grid-column: 1 / -1; } }

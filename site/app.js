@@ -2743,7 +2743,6 @@
     try {
       last = await computeRoute(model, false, say);
       showResult();
-      saveRoute(last);
     } catch (err) {
       say(err.message || String(err), true);
     } finally {
@@ -3661,7 +3660,6 @@
   appIcon();
 
   el('reset').addEventListener('click', () => {
-    clearSavedRoute();
     el('gpx-help').hidden = true;
     if (wxOn) wxClose(true); // Reset : on quitte aussi le mode Météo
     clearResult();
@@ -3692,11 +3690,11 @@
     const out = new Response(new Blob([inflate ? str : new TextEncoder().encode(str)]).stream().pipeThrough(cs));
     return inflate ? out.text() : new Uint8Array(await out.arrayBuffer());
   }
-  async function saveRoute(r) {
+  async function packRoute(r, name) {
     try {
-      if (!r || !r.legs || typeof CompressionStream === 'undefined') return;
+      if (!r || !r.legs || typeof CompressionStream === 'undefined') return '';
       const K = ['t0', 'h0', 'dist', 'dur', 'dt', 'alt', 'vias', 'model', 'modelId', 'wName', 'snapped', 'coastCut', 'hazCut', 'dmin', 'coastM', 'noWaves', 'useCur'];
-      const base = { v: 1, ts: ui.tStart.value, at: Date.now(), pts: [start, ...vias.map(v => v.p), end].map(p => [p.lat, p.lon]), r: Object.fromEntries(K.map(k => [k, r[k]])) };
+      const base = { v: 1, name, ts: ui.tStart.value, at: r.at || Date.now(), pts: [start, ...vias.map(v => v.p), end].map(p => [p.lat, p.lon]), r: Object.fromEntries(K.map(k => [k, r[k]])) };
       const leg = l => { const o = {}; for (const k in l) if (l[k] != null && l[k] !== false && typeof l[k] !== 'function') o[k] = l[k]; return o; };
       const rnd = (k, v) => (typeof v === 'number' ? Math.round(v * 1e5) / 1e5 : v);
       let legs = r.legs, v = '';
@@ -3708,21 +3706,13 @@
         const L = legs; legs = L.filter((l, i) => i % 2 === 0 || i === L.length - 1 || !!l.mot !== !!(L[i - 1] && L[i - 1].mot) || l.wait);
         v = '';
       }
-      if (!v) return;
-      clearSavedRoute();
-      const n = Math.ceil(v.length / 3000);
-      for (let i = 0; i < n; i++) document.cookie = `${RTK}${i}=${v.slice(i * 3000, (i + 1) * 3000)}; Max-Age=31536000; Path=/; Secure; SameSite=Lax`;
-      document.cookie = `${RTK}n=${n}; Max-Age=31536000; Path=/; Secure; SameSite=Lax`;
-    } catch (e) {}
+      return v;
+    } catch (e) { return ''; }
   }
-  async function loadSavedRoute() {
+  async function openRoute(o) {
     try {
-      const n = rtOld(); if (!n || typeof DecompressionStream === 'undefined' || start || last) return;
-      const C = Object.fromEntries(document.cookie.split('; ').map(c => { const i = c.indexOf('='); return [c.slice(0, i), c.slice(i + 1)]; }));
-      let v = ''; for (let i = 0; i < n; i++) { if (C[RTK + i] == null) return; v += C[RTK + i]; }
-      const o = JSON.parse(await zip(unb64u(v), true));
-      if (!o || o.v !== 1 || !o.pts || o.pts.length < 2 || !o.r || !o.r.legs || o.r.legs.length < 2) return;
-      if (start || last) return;
+      if (!o || o.v !== 1 || !o.pts || o.pts.length < 2 || !o.r || !o.r.legs || o.r.legs.length < 2) return false;
+      el('reset').click();
       const P = o.pts;
       setPoint('start', { lat: P[0][0], lng: P[0][1] });
       P.slice(1, -1).forEach(q => addVia({ lat: q[0], lon: q[1] }));
@@ -3736,8 +3726,7 @@
         fineOn = true; coastM = o.r.coastM != null ? o.r.coastM : OPT.coast; coastNear = P.map(q => ({ lat: q[0], lon: q[1] }));
         await loadFineKeys(fineKeysAlong(o.r.legs));
       } catch (e) {}
-      if (start !== null && last) return;
-      last = { ...o.r, saved: true };
+      last = { ...o.r, saved: true, at: o.at };
       showResult();
       const b = map.getBounds(), L = last.legs;
       const bb = L.reduce((a, l) => [Math.min(a[0], l.lon), Math.min(a[1], l.lat), Math.max(a[2], l.lon), Math.max(a[3], l.lat)], [180, 90, -180, -90]);
@@ -3745,11 +3734,94 @@
       const ph = isMobile() ? panel.getBoundingClientRect().height : 0, pw = !isMobile() ? panel.getBoundingClientRect().right : 0;
       map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: { top: 70, bottom: Math.min(ph + 30, innerHeight * 0.6), left: pw + 60, right: 100 }, duration: 0, maxZoom: 13 });
       const d = new Date(o.at), dt = `${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
-      el('peek').insertAdjacentHTML('beforeend', `<small>Route enregistrée le ${dt}, météo de ce moment-là</small>`);
-      say(`Dernière route, calculée le ${dt} avec la météo de ce moment-là. Touchez « Relancer » pour la mettre à jour.`);
-    } catch (e) {}
+      el('peek').insertAdjacentHTML('beforeend', `<small>${esc(o.name || 'Trace')} · calculée le ${dt}</small>`);
+      say(`« ${o.name || 'Trace'} », calculée le ${dt} avec la météo de ce moment-là. Touchez « Relancer » pour la mettre à jour.`);
+      return true;
+    } catch (e) { return false; }
   }
-  if (map.loaded()) setTimeout(loadSavedRoute, 300); else map.once('load', () => setTimeout(loadSavedRoute, 300));
+  clearSavedRoute(); // ancienne « dernière route » gardée à la racine : plus utilisée
+
+  // ---------- Traces : 5 routes au maximum, dans des cookies rangés sous /traces/ ----------
+  // Ces cookies ne sont envoyés qu'aux adresses /traces/ : le site lui-même ne les reçoit pas (limite d'en-tête du serveur).
+  // Lecture par un petit cadre caché ouvert sur /traces/.
+  const TRK = 'tk', TRMAX = 5, TRP = 'Path=/traces/; Secure; SameSite=Lax';
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function trCookies() {
+    return new Promise(res => {
+      const f = document.createElement('iframe'); f.hidden = true; f.src = 'traces/?' + Date.now();
+      const done = () => { let c = ''; try { c = f.contentDocument.cookie; } catch (e) {} f.remove(); res(Object.fromEntries(c.split('; ').filter(Boolean).map(x => { const i = x.indexOf('='); return [x.slice(0, i), x.slice(i + 1)]; }))); };
+      f.onload = done; setTimeout(() => { if (f.isConnected) done(); }, 6000);
+      document.body.appendChild(f);
+    });
+  }
+  async function trList() {
+    const C = await trCookies(), out = [];
+    for (let k = 0; k < TRMAX; k++) {
+      const n = +C[`${TRK}${k}n`]; if (!n) continue;
+      let v = ''; for (let i = 0; i < n; i++) { if (C[`${TRK}${k}_${i}`] == null) { v = ''; break; } v += C[`${TRK}${k}_${i}`]; }
+      if (!v) continue;
+      try { const o = JSON.parse(await zip(unb64u(v), true)); out.push({ k, o }); } catch (e) {}
+    }
+    return out.sort((a, b) => b.o.at - a.o.at);
+  }
+  function trDel(k, n) {
+    for (let i = 0; i < Math.max(n || 0, 4); i++) document.cookie = `${TRK}${k}_${i}=; Max-Age=0; ${TRP}`;
+    document.cookie = `${TRK}${k}n=; Max-Age=0; ${TRP}`;
+  }
+  function trDefName() {
+    const r = last; if (!r) return '';
+    const d = timeAt(r.h0);
+    return `Route du ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${nf0.format(r.dist)} M`;
+  }
+  let trItems = [];
+  async function trRender() {
+    trItems = await trList();
+    const can = !!(last && last.legs);
+    el('tr-save').hidden = !can;
+    const ul = el('tr-list');
+    ul.innerHTML = trItems.length ? trItems.map((t, i) => {
+      const d = new Date(t.o.at);
+      return `<li><div class="tr-txt"><b>${esc(t.o.name || 'Trace')}</b><small>calculée le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</small></div><button type="button" class="btn tr-open" data-i="${i}">Ouvrir</button><button type="button" class="btn tr-del" data-i="${i}">Supprimer</button></li>`;
+    }).join('') : '<li class="tr-empty">Aucune trace enregistrée.</li>';
+    if (!can && !trItems.length) el('tr-msg').textContent = 'Calculez une route, puis revenez ici pour l\'enregistrer.';
+  }
+  async function trOpenSheet() {
+    el('tr-msg').textContent = ''; el('tr-msg').classList.remove('err');
+    el('tr-name').value = trDefName();
+    el('tr-back').hidden = false; el('trace-btn').setAttribute('aria-pressed', 'true');
+    await trRender();
+  }
+  function trCloseSheet() { el('tr-back').hidden = true; el('trace-btn').setAttribute('aria-pressed', 'false'); }
+  el('trace-btn').addEventListener('click', () => (el('tr-back').hidden ? trOpenSheet() : trCloseSheet()));
+  el('tr-close').addEventListener('click', trCloseSheet);
+  el('tr-back').addEventListener('click', e => { if (e.target === el('tr-back')) trCloseSheet(); });
+  el('tr-save-btn').addEventListener('click', async () => {
+    const msg = el('tr-msg'); msg.classList.remove('err');
+    if (!last || !last.legs) return;
+    const used = new Set(trItems.map(t => t.k));
+    let k = -1; for (let i = 0; i < TRMAX; i++) if (!used.has(i)) { k = i; break; }
+    if (k < 0) { msg.textContent = '5 traces au maximum : supprimez-en une pour enregistrer celle-ci.'; msg.classList.add('err'); return; }
+    const name = el('tr-name').value.trim().slice(0, 50) || trDefName();
+    const v = await packRoute(last, name);
+    if (!v) { msg.textContent = 'Route non enregistrée.'; msg.classList.add('err'); return; }
+    trDel(k);
+    const n = Math.ceil(v.length / 3000);
+    for (let i = 0; i < n; i++) document.cookie = `${TRK}${k}_${i}=${v.slice(i * 3000, (i + 1) * 3000)}; Max-Age=31536000; ${TRP}`;
+    document.cookie = `${TRK}${k}n=${n}; Max-Age=31536000; ${TRP}`;
+    await trRender();
+    msg.textContent = trItems.some(t => t.k === k) ? `« ${name} » enregistrée.` : 'Route non enregistrée.';
+  });
+  el('tr-list').addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const t = trItems[+b.dataset.i]; if (!t) return;
+    if (b.classList.contains('tr-del')) {
+      if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Confirmer'; return; }
+      trDel(t.k, 8); await trRender(); el('tr-msg').textContent = 'Trace supprimée.'; return;
+    }
+    trCloseSheet();
+    const ok = await openRoute(t.o);
+    if (!ok) say('Trace illisible.', true);
+  });
 
   function buildGpx() {
     const r = last; if (!r) return false;
