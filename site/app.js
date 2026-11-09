@@ -4,7 +4,7 @@
 
   // ---------- Modèles ----------
   const MODELS = [
-    { id: 'ecmwf_ifs025', name: 'ECMWF', note: 'IFS, 15 jours', days: 15, wave: ['ecmwf_wam', 'ECMWF WAM'] },
+    { id: 'ecmwf_ifs', name: 'ECMWF', note: 'IFS 9 km, 15 jours', days: 15, wave: ['ecmwf_wam', 'ECMWF WAM'] },
     { id: 'gfs_seamless', name: 'GFS', note: 'NOAA, 16 jours', days: 16, wave: ['ncep_gfswave025', 'GFS Wave'] },
     { id: 'icon_seamless', name: 'ICON', note: 'DWD, 7 jours', days: 7, wave: ['dwd_ewam', 'DWD EWAM'] },
     { id: 'meteofrance_arome_france_hd', name: 'AROME', note: 'Météo-France 1,5 km, 2 jours', days: 3, fine: true, wave: ['meteofrance_wave', 'MFWAM Météo-France'], area: { s: 37.6, n: 55.3, w: -11.9, e: 15.9 } },
@@ -3229,8 +3229,8 @@
     const sel = el('cmp-model'); if (!sel || !last) return;
     sel.innerHTML = MODELS.filter(m => m.id !== last.modelId).map(m => `<option value="${m.id}">${m.name}${m.note ? ' · ' + m.note : ''}</option>`).join('');
     // AROME ↔ ARPEGE (les deux de Météo-France), sinon ECMWF (ou GFS si on part d'ECMWF)
-    const pairs = { meteofrance_arome_france_hd: 'meteofrance_seamless', meteofrance_seamless: 'meteofrance_arome_france_hd', ecmwf_ifs025: 'gfs_seamless' };
-    const pref = pairs[last.modelId] || 'ecmwf_ifs025';
+    const pairs = { meteofrance_arome_france_hd: 'meteofrance_seamless', meteofrance_seamless: 'meteofrance_arome_france_hd', ecmwf_ifs: 'gfs_seamless' };
+    const pref = pairs[last.modelId] || 'ecmwf_ifs';
     if (MODELS.some(m => m.id === pref)) sel.value = pref;
   }
   function maxGap(A, B) {
@@ -3633,7 +3633,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=178`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=179`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
