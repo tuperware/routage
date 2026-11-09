@@ -3046,6 +3046,7 @@
     const wmax = Math.max(...r.legs.filter(n => n.tws != null).map(n => n.tws));
     ui.dur.textContent = fmtDur(r.dur);
     ui.eta.textContent = hfmt.format(timeAt(r.h0 + r.dur));
+    el('r-dep').textContent = hfmt.format(timeAt(r.h0));
     ui.dist.textContent = distTxt(r.dist);
     ui.wmax.textContent = `${nf0.format(wmax)} nds`;
     // Rafales le long de la route (données du modèle météo)
