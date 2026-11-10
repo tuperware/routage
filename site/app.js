@@ -2545,6 +2545,9 @@
   let tStartSet = false;
   ui.tStart.addEventListener('input', () => { tStartSet = true; });
   el('r-tstart').addEventListener('input', () => { tStartSet = true; });
+  // « Maintenant » : départ à l'heure actuelle (arrondie aux 5 minutes suivantes), et suivi automatique comme à l'ouverture
+  const nowStart = () => { const n = new Date(); n.setSeconds(0, 0); n.setMinutes(Math.ceil(n.getMinutes() / 5) * 5); return n; };
+  el('t-now').addEventListener('click', () => { ui.tStart.value = localInput(nowStart()); el('r-tstart').value = ui.tStart.value; tStartSet = false; if (wxOn) wxLoad(); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden || tStartSet || last) return;
     const n = new Date(); n.setMinutes(0, 0, 0); n.setHours(n.getHours() + 1); ui.tStart.value = localInput(n);
@@ -3719,7 +3722,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=183`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=184`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
@@ -3760,6 +3763,8 @@
 
   el('reset').addEventListener('click', () => {
     el('gpx-help').hidden = true;
+    // Effacer : l'heure de départ revient à l'heure suivante, comme à l'ouverture
+    { const n = new Date(); n.setMinutes(0, 0, 0); n.setHours(n.getHours() + 1); ui.tStart.value = localInput(n); el('r-tstart').value = ui.tStart.value; tStartSet = false; }
     if (wxOn) wxClose(true); // Reset : on quitte aussi le mode Météo
     clearResult(); clearTraceLine();
     // Plus rien du grib à l'écran : vent, vagues, courant

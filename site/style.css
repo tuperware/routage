@@ -681,3 +681,8 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 .cur-note.fia small { display: block; opacity: .75; margin-top: 2px; }
 .pk-fia { font-weight: 600; }
 .pk-fia.fia0 { color: #1f7a3a; } .pk-fia.fia1 { color: #8a6400; } .pk-fia.fia2 { color: #b35c00; }
+.t-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: stretch; }
+.t-row input { width: 100%; min-width: 0; box-sizing: border-box; }
+.t-row .t-now { min-height: 48px; padding: 0 12px; font-weight: 600; white-space: nowrap; }
+.t-row .t-now[hidden] { display: none; }
+.t-row:has(> .t-now[hidden]) { grid-template-columns: minmax(0, 1fr); }
