@@ -4,11 +4,11 @@
 
   // ---------- Modèles ----------
   const MODELS = [
-    { id: 'ecmwf_ifs', name: 'ECMWF', note: 'IFS 9 km, 15 jours', days: 15, wave: ['ecmwf_wam', 'ECMWF WAM'] },
+    { id: 'ecmwf_ifs', name: 'ECMWF', note: 'IFS 9 km, 15 jours', days: 15, res: 0.1, wave: ['ecmwf_wam', 'ECMWF WAM'] },
     { id: 'meteofrance_arome_france_hd', name: 'AROME', note: 'Météo-France 1,5 km, 2 jours', days: 3, fine: true, wave: ['meteofrance_wave', 'MFWAM Météo-France'], area: { s: 37.6, n: 55.3, w: -11.9, e: 15.9 } },
-    { id: 'meteofrance_seamless', name: 'ARPEGE', note: 'Météo-France, 4 jours', days: 5, wave: ['meteofrance_wave', 'MFWAM Météo-France'] },
-    { id: 'icon_seamless', name: 'ICON', note: 'DWD, 7 jours', days: 7, wave: ['dwd_ewam', 'DWD EWAM'] },
-    { id: 'ukmo_seamless', name: 'UKMO', note: 'Met Office, 7 jours', days: 7 },
+    { id: 'meteofrance_seamless', name: 'ARPEGE', note: 'Météo-France, 4 jours', days: 5, res: 0.1, wave: ['meteofrance_wave', 'MFWAM Météo-France'] },
+    { id: 'icon_seamless', name: 'ICON', note: 'DWD, 7 jours', days: 7, res: 0.1, wave: ['dwd_ewam', 'DWD EWAM'] },
+    { id: 'ukmo_seamless', name: 'UKMO', note: 'Met Office, 7 jours', days: 7, res: 0.1 },
     { id: 'gfs_seamless', name: 'GFS', note: 'NOAA, 16 jours', days: 16, wave: ['ncep_gfswave025', 'GFS Wave'] },
     { id: 'ecmwf_aifs025_single', name: 'AIFS', note: 'ECMWF IA, 15 jours', days: 15, wave: ['ecmwf_wam', 'ECMWF WAM'] },
   ];
@@ -144,7 +144,7 @@
   }
 
   // ---------- Réglages bateau ----------
-  const OPT = { hmax: 4, pol: 1, wmax: 35, eng: false, min: 3, engs: 5, engw: 15, pk: 'c', cx: 20, coast: 300, dmin: 2, spi: true, cp: 1, ct: 1, cd: 1, cl: 1 };
+  const OPT = { hmax: 4, pol: 1, wmax: 35, eng: false, min: 3, engs: 5, engw: 15, pk: 'c', cx: 20, coast: 300, dmin: 2, wvr: 0, man: 1, spi: true, cp: 1, ct: 1, cd: 1, cl: 1 };
   const lerp = (a, b, f) => a + (b - a) * f;
   // Coefficient selon l'allure : près jusqu'à 60°, travers à 90°, portant à partir de 135°, transition linéaire entre deux.
   function allureCoef(twa, o = OPT) {
@@ -167,9 +167,15 @@
     P = save;
     return v * o.pol * allureCoef(twa, o) * lightCoef(tws, o);
   }
-  function boatSpeed(twa, tws) {
+  // Ralentissement dans les vagues (réglage, 0 = sans) : % par mètre au-delà de 1 m, plein au près, moitié au travers, rien au portant
+  function waveFac(twa, hs) {
+    if (!OPT.wvr || !(hs > 1)) return 1;
+    const a = Math.abs(norm180(twa)), f = a <= 60 ? 1 : a >= 120 ? 0 : (120 - a) / 60;
+    return Math.max(0.4, 1 - OPT.wvr / 100 * (hs - 1) * f);
+  }
+  function boatSpeed(twa, tws, hs) {
     if (tws > OPT.wmax) return { s: 0, m: false };
-    const v = sailSpeed(twa, tws);
+    const v = sailSpeed(twa, tws) * waveFac(twa, hs);
     if (OPT.eng && v < OPT.min && motOk(twa, tws)) return { s: OPT.engs, m: true };
     return { s: v, m: false };
   }
@@ -812,7 +818,10 @@
     const span = Math.max(bb.n - bb.s, bb.e - bb.w);
     const M = MODELS.find(x => x.id === modelId) || {};
     // Modèle fin (AROME) : grille jusqu'à 0,1° pour garder le détail près des côtes
-    const step = M.fine ? Math.max(0.1, Math.ceil((span / 14) * 10) / 10) : Math.max(0.25, Math.ceil((span / 14) * 4) / 4);
+    // Modèles à maille fine (ECMWF 9 km, ICON, ARPEGE, UKMO) : grille plus serrée sur les trajets courts
+    const step = M.fine ? Math.max(0.1, Math.ceil((span / 14) * 10) / 10)
+      : M.res ? Math.max(M.res, Math.ceil((span / 18) / M.res) * M.res)
+      : Math.max(0.25, Math.ceil((span / 14) * 4) / 4);
     const lats = [], lons = [];
     // Grille calée sur des multiples du pas : déplacer un peu un point redemande les mêmes données (mémoire)
     const s0 = Math.round(bb.s / step) * step, n0 = Math.round(bb.n / step) * step;
@@ -1041,7 +1050,7 @@
   // Cap à tenir pour suivre une route fond donnée malgré le courant : {hdg, bs, sog} ou null
   function steer(brg, w, c, keepMot) {
     const spd = hd => {
-      let bs = boatSpeed(hd - w.twd, w.tws);
+      let bs = boatSpeed(hd - w.twd, w.tws, w.hs);
       if (keepMot && OPT.eng && !bs.m && bs.s < OPT.engs && w.tws <= OPT.wmax && motOk(hd - w.twd, w.tws)) bs = { s: OPT.engs, m: true };
       return bs;
     };
@@ -1095,6 +1104,9 @@
         const w = windAt(p.lat, p.lon, h);
         if (!w) { horizon = true; continue; }
         const wv = waveAt(p.lat, p.lon, h);
+        w.hs = wv ? wv.hs : 0;
+        // Bord du bateau à l'étape précédente (pour compter le temps perdu au virement ou à l'empannage)
+        const man = OPT.man / 60, ps = p.parent && !p.mot && p.hdg != null ? Math.sign(norm180(p.hdg - w.twd)) : 0;
         const tooBig = q => { const x = waveAt(q.lat, q.lon, h + dt); if (x && x.hs > OPT.hmax) { rej.wave++; rej.waveMin = Math.min(rej.waveMin, x.hs); return true; } return false; };
         if (w.tws > OPT.wmax) { rej.wind++; rej.windMin = Math.min(rej.windMin, w.tws); }
         const dD = distNm(p, end), bD = bearing(p, end);
@@ -1105,12 +1117,13 @@
           if (!best || ta < best.h) best = { ...end, h: ta, parent: p, hdg: stD.hdg, tws: w.tws, twd: w.twd, bsp: stD.bs.s, mot: stD.bs.m, wv, cog: bD, sog: sD, cu };
         }
         for (let a = 0; a < 360; a += HDG) {
-          const bs = boatSpeed(a - w.twd, w.tws), s = bs.s;
+          const bs = boatSpeed(a - w.twd, w.tws, w.hs), s = bs.s;
           if (s < 0.2) continue;
+          const lost = man > 0 && ps && !bs.m && Math.sign(norm180(a - w.twd)) !== ps ? Math.min(dt, man) : 0;
           // Avec courant : on avance sur le fond (vitesse surface + courant)
           let cg = a, sg = s;
           if (cu) { const vx = s * Math.sin(rad(a)) + cu.u, vy = s * Math.cos(rad(a)) + cu.v; sg = Math.hypot(vx, vy); cg = norm360(deg(Math.atan2(vx, vy))); if (sg < 0.2) continue; }
-          const q = move(p, cg, sg * dt);
+          const q = move(p, cg, sg * (dt - lost));
           const c = cellOf(q);
           if (wave && seen.has(c)) continue;
           const dE = distNm(q, end);
@@ -1186,6 +1199,7 @@
       if (rem < 0.05) break;
       const w = windAt(cur.lat, cur.lon, h);
       if (!w) return null;
+      const wv0 = waveAt(cur.lat, cur.lon, h); w.hs = wv0 ? wv0.hs : 0;
       const brg = bearing(cur, b), cu = curUse(cur.lat, cur.lon, h);
       // Déjà au moteur : on ne remet pas les voiles pour aller moins vite, on garde le moteur (dans steer)
       const st = steer(brg, w, cu, keepMot);
@@ -3480,7 +3494,7 @@
   el('next').addEventListener('click', () => stepLeg(1));
 
   // Réglages : lecture, mémoire locale, résumé
-  const optIds = { hmax: 'o-hmax', pol: 'o-pol', wmax: 'o-wmax', cx: 'o-cx', coast: 'o-coast', dmin: 'o-dmin', eng: 'o-eng', min: 'o-min', engs: 'o-engs', engw: 'o-engw' };
+  const optIds = { hmax: 'o-hmax', pol: 'o-pol', wmax: 'o-wmax', cx: 'o-cx', coast: 'o-coast', dmin: 'o-dmin', wvr: 'o-wvr', man: 'o-man', eng: 'o-eng', min: 'o-min', engs: 'o-engs', engw: 'o-engw' };
   function readOpt() {
     const num = (id, d, lo, hi) => { const v = parseFloat(String(el(id).value).replace(',', '.')); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
     OPT.pol = num('o-pol', 100, 40, 110) / 100;
@@ -3488,6 +3502,8 @@
     OPT.cx = num('o-cx', 20, 5, 40);
     OPT.coast = num('o-coast', 300, 50, 2000);
     OPT.dmin = num('o-dmin', 2, 0, 20);
+    OPT.wvr = num('o-wvr', 0, 0, 30);
+    OPT.man = num('o-man', 1, 0, 10);
     OPT.eng = el('o-eng').checked;
     OPT.min = num('o-min', 3, 0.5, 10);
     OPT.engs = num('o-engs', 5, 1, 12);
@@ -3533,6 +3549,8 @@
     if (o.cx != null && Number.isFinite(+o.cx)) el('o-cx').value = o.cx;
     if (o.coast != null && Number.isFinite(+o.coast)) el('o-coast').value = o.coast;
     if (o.dmin != null && Number.isFinite(+o.dmin)) el('o-dmin').value = o.dmin;
+    if (o.wvr != null && Number.isFinite(+o.wvr)) el('o-wvr').value = o.wvr;
+    if (o.man != null && Number.isFinite(+o.man)) el('o-man').value = o.man;
     if (o.eng != null) el('o-eng').checked = !!o.eng;
     if (o.min != null) el('o-min').value = o.min;
     if (o.engs != null) el('o-engs').value = o.engs;
@@ -3554,6 +3572,8 @@
         if (q.has('cx')) o.cx = +q.get('cx') || 20;
         if (q.has('cote')) o.coast = +q.get('cote') || 300;
         if (q.has('prof')) o.dmin = Number.isFinite(+q.get('prof')) ? +q.get('prof') : 2;
+        if (q.has('vr')) o.wvr = Number.isFinite(+q.get('vr')) ? +q.get('vr') : 0;
+        if (q.has('vir')) o.man = Number.isFinite(+q.get('vir')) ? +q.get('vir') : 1;
         if (q.has('spi')) o.spi = q.get('spi') !== '0';
         if (q.has('cur')) o.cur = q.get('cur') !== '0';
         if (q.has('ico')) o.ico = q.get('ico');
@@ -3569,7 +3589,7 @@
     try { document.cookie = `${CK}=${v}; Max-Age=31536000; Path=/; Secure; SameSite=Lax`; } catch (e) {}
     try {
       const q = new URLSearchParams(location.search);
-      q.set('pol', Math.round(OPT.pol * 100)); q.set('wmax', OPT.wmax); q.set('eng', OPT.eng ? '1' : '0'); q.set('min', OPT.min); q.set('engs', OPT.engs); q.set('mfv', OPT.engw); q.set('pk', OPT.pk); q.set('hmax', OPT.hmax); q.set('cx', OPT.cx); q.set('cote', OPT.coast); q.set('prof', OPT.dmin); q.set('spi', OPT.spi ? '1' : '0'); q.set('cur', OPT.cur ? '1' : '0'); q.set('ico', OPT.ico);
+      q.set('pol', Math.round(OPT.pol * 100)); q.set('wmax', OPT.wmax); q.set('eng', OPT.eng ? '1' : '0'); q.set('min', OPT.min); q.set('engs', OPT.engs); q.set('mfv', OPT.engw); q.set('pk', OPT.pk); q.set('hmax', OPT.hmax); q.set('cx', OPT.cx); q.set('cote', OPT.coast); q.set('prof', OPT.dmin); q.set('vr', OPT.wvr); q.set('vir', OPT.man); q.set('spi', OPT.spi ? '1' : '0'); q.set('cur', OPT.cur ? '1' : '0'); q.set('ico', OPT.ico);
       ['cp', 'ct', 'cd', 'cl'].forEach(k => q.set(k, Math.round(OPT[k] * 100)));
       history.replaceState(null, '', `${location.pathname}?${q}`);
     } catch (e) {}
@@ -3633,7 +3653,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=180`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=181`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
