@@ -3689,6 +3689,21 @@
       if (last && last.legs) say('Polaire changée : touchez « Relancer » pour mettre la route à jour.');
     } catch (x) { msg.textContent = `Polaire non chargée : ${x.message}`; msg.classList.add('err'); }
   });
+  // Essai : polaire ORC d'un Sun Odyssey 42.2 (certificat ROU, réf. 05040004RN4), taille proche d'un Ovni 395 — ce n'est pas une polaire d'Ovni
+  el('o-so42').addEventListener('click', async () => {
+    el('o-x-pick').hidden = true;
+    const msg = el('o-x-msg');
+    try {
+      const r = await fetch('polaires/orc_sun_odyssey_42_2.pol'); if (!r.ok) throw new Error('fichier introuvable');
+      const p = parsePolarText(await r.text());
+      POLARS.x = p; PX_NAME = 'Sun Odyssey 42.2 essai';
+      savePx(PX_NAME, p);
+      msg.textContent = `${PX_NAME} : polaire ORC d'un bateau de taille proche de l'Ovni 395 (12,3 m, 9,5 t). Ce n'est pas une polaire d'Ovni. Pas de données au-delà de 24 nds.`; msg.classList.remove('err');
+      el('o-pk').dataset.v = 'x'; polKey = ''; saveOpt();
+      { const ib = el('o-ico').querySelector('button[data-v="m"]'); if (ib && OPT.ico !== 'm') ib.click(); }
+      if (last && last.legs) say('Polaire changée : touchez « Relancer » pour mettre la route à jour.');
+    } catch (x) { msg.textContent = `Polaire non chargée : ${x.message}`; msg.classList.add('err'); }
+  });
   el('o-file').addEventListener('change', async () => {
     const f = el('o-file').files[0]; el('o-file').value = '';
     if (!f) return;
@@ -3719,7 +3734,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=186`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=187`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
