@@ -681,3 +681,11 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 .cur-note.fia small { display: block; opacity: .75; margin-top: 2px; }
 .pk-fia { font-weight: 600; }
 .pk-fia.fia0 { color: #1f7a3a; } .pk-fia.fia1 { color: #8a6400; } .pk-fia.fia2 { color: #b35c00; }
+/* Repli du bandeau de droite (téléphone) */
+.wave-fab .fab-fold { display: none; }
+.wave-fab .fab-fold svg { color: #4a5568; transition: transform .15s; }
+@media (max-width: 720px) {
+  .wave-fab .fab-fold { display: flex; min-height: 46px; }
+  .wave-fab.folded .fab-btn:not(.fab-fold) { display: none !important; }
+  .wave-fab.folded .fab-fold svg { transform: rotate(180deg); }
+}
