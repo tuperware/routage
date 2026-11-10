@@ -4,11 +4,11 @@
 
   // ---------- Modèles ----------
   const MODELS = [
-    { id: 'ecmwf_ifs', name: 'ECMWF', note: 'IFS 9 km, 15 jours', days: 15, res: 0.1, wave: ['ecmwf_wam', 'ECMWF WAM'] },
+    { id: 'ecmwf_ifs', name: 'ECMWF', note: 'IFS 9 km, 15 jours', days: 15, wave: ['ecmwf_wam', 'ECMWF WAM'] },
     { id: 'meteofrance_arome_france_hd', name: 'AROME', note: 'Météo-France 1,5 km, 2 jours', days: 3, fine: true, wave: ['meteofrance_wave', 'MFWAM Météo-France'], area: { s: 37.6, n: 55.3, w: -11.9, e: 15.9 } },
-    { id: 'meteofrance_seamless', name: 'ARPEGE', note: 'Météo-France, 4 jours', days: 5, res: 0.1, wave: ['meteofrance_wave', 'MFWAM Météo-France'] },
-    { id: 'icon_seamless', name: 'ICON', note: 'DWD, 7 jours', days: 7, res: 0.1, wave: ['dwd_ewam', 'DWD EWAM'] },
-    { id: 'ukmo_seamless', name: 'UKMO', note: 'Met Office, 7 jours', days: 7, res: 0.1 },
+    { id: 'meteofrance_seamless', name: 'ARPEGE', note: 'Météo-France, 4 jours', days: 5, wave: ['meteofrance_wave', 'MFWAM Météo-France'] },
+    { id: 'icon_seamless', name: 'ICON', note: 'DWD, 7 jours', days: 7, wave: ['dwd_ewam', 'DWD EWAM'] },
+    { id: 'ukmo_seamless', name: 'UKMO', note: 'Met Office, 7 jours', days: 7 },
     { id: 'gfs_seamless', name: 'GFS', note: 'NOAA, 16 jours', days: 16, wave: ['ncep_gfswave025', 'GFS Wave'] },
     { id: 'ecmwf_aifs025_single', name: 'AIFS', note: 'ECMWF IA, 15 jours', days: 15, wave: ['ecmwf_wam', 'ECMWF WAM'] },
   ];
@@ -818,10 +818,8 @@
     const span = Math.max(bb.n - bb.s, bb.e - bb.w);
     const M = MODELS.find(x => x.id === modelId) || {};
     // Modèle fin (AROME) : grille jusqu'à 0,1° pour garder le détail près des côtes
-    // Modèles à maille fine (ECMWF 9 km, ICON, ARPEGE, UKMO) : grille plus serrée sur les trajets courts
-    const step = M.fine ? Math.max(0.1, Math.ceil((span / 14) * 10) / 10)
-      : M.res ? Math.max(M.res, Math.ceil((span / 18) / M.res) * M.res)
-      : Math.max(0.25, Math.ceil((span / 14) * 4) / 4);
+    // Grille à 0,25° (essais du 10/11 : la grille à 0,1° faisait des détours et bloquait l'entrée des baies)
+    const step = M.fine ? Math.max(0.1, Math.ceil((span / 14) * 10) / 10) : Math.max(0.25, Math.ceil((span / 14) * 4) / 4);
     const lats = [], lons = [];
     // Grille calée sur des multiples du pas : déplacer un peu un point redemande les mêmes données (mémoire)
     const s0 = Math.round(bb.s / step) * step, n0 = Math.round(bb.n / step) * step;
@@ -887,20 +885,33 @@
     const x0 = Math.min(W.nx - 2, Math.floor(fx)), y0 = Math.min(W.ny - 2, Math.floor(fy));
     const ax = fx - x0, ay = fy - y0;
     const t0 = Math.min(W.nt - 2, Math.floor(h)), at = h - t0;
-    let U = 0, V = 0, Gs = 0, Gw = 0;
-    for (let dt = 0; dt < 2; dt++) {
-      const wt = dt ? at : 1 - at;
-      if (wt === 0) continue;
-      for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
-        const w = wt * (dy ? ay : 1 - ay) * (dx ? ax : 1 - ax);
-        if (w === 0) continue;
-        const o = ((t0 + dt) * W.ny + y0 + dy) * W.nx + x0 + dx;
-        const uu = W.u[o], vv = W.v[o];
-        if (Number.isNaN(uu)) return null;
-        U += w * uu; V += w * vv;
-        if (W.g && !Number.isNaN(W.g[o])) { Gs += w * W.g[o]; Gw += w; }
+    // Cases « terre » (fond de baie, port étroit) : on prend le vent des cases en mer voisines
+    const acc = (xs, ys) => {
+      let U = 0, V = 0, Gs = 0, Gw = 0, S = 0;
+      for (let dt = 0; dt < 2; dt++) {
+        const wt = dt ? at : 1 - at;
+        if (wt === 0) continue;
+        for (const [xx, wx] of xs) for (const [yy, wy] of ys) {
+          const w = wt * wx * wy;
+          if (w === 0) continue;
+          const o = ((t0 + dt) * W.ny + yy) * W.nx + xx;
+          const uu = W.u[o], vv = W.v[o];
+          if (Number.isNaN(uu)) continue;
+          U += w * uu; V += w * vv; S += w;
+          if (W.g && !Number.isNaN(W.g[o])) { Gs += w * W.g[o]; Gw += w; }
+        }
       }
+      return S > 1e-6 ? { U: U / S, V: V / S, Gs, Gw: Gw / S, S } : null;
+    };
+    let A = acc([[x0, 1 - ax], [x0 + 1, ax]], [[y0, 1 - ay], [y0 + 1, ay]]);
+    for (let r = 1; !A && r <= 2; r++) {
+      const xs = [], ys = [];
+      for (let x = Math.max(0, x0 - r); x <= Math.min(W.nx - 1, x0 + 1 + r); x++) xs.push([x, 1]);
+      for (let y = Math.max(0, y0 - r); y <= Math.min(W.ny - 1, y0 + 1 + r); y++) ys.push([y, 1]);
+      A = acc(xs, ys);
     }
+    if (!A) return null;
+    const U = A.U, V = A.V, Gw = A.Gw, Gs = A.Gw > 0 ? A.Gs / A.S : 0;
     const tws = Math.hypot(U, V);
     return { tws, twd: norm360(deg(Math.atan2(-U, -V))), gu: Gw > 0.5 ? Math.max(tws, Gs / Gw) : null };
   }
@@ -1099,7 +1110,7 @@
 
     for (let k = 0; k < maxSteps; k++) {
       const h = h0 + k * dt;
-      const next = new Map(); const land0 = rej.land, wave0 = rej.wave;
+      const next = new Map(); const land0 = rej.land, wave0 = rej.wave; let moving = 0;
       for (const p of frontier) {
         const w = windAt(p.lat, p.lon, h);
         if (!w) { horizon = true; continue; }
@@ -1119,6 +1130,7 @@
         for (let a = 0; a < 360; a += HDG) {
           const bs = boatSpeed(a - w.twd, w.tws, w.hs), s = bs.s;
           if (s < 0.2) continue;
+          moving++;
           const lost = man > 0 && ps && !bs.m && Math.sign(norm180(a - w.twd)) !== ps ? Math.min(dt, man) : 0;
           // Avec courant : on avance sur le fond (vitesse surface + courant)
           let cg = a, sg = s;
@@ -1140,6 +1152,8 @@
       }
       if (best) break;
       // Calme plat partout : on attend sur place le retour du vent au lieu d'abandonner
+      // Le bateau avance mais toutes les cases accessibles sont déjà vues : bloqué par la côte, pas un calme
+      if (!next.size && frontier.length && moving > 0 && rej.wave === wave0) return { error: 'stuck', isos, rej };
       if (!next.size && frontier.length && rej.land === land0 && rej.wave === wave0) { rej.calm = (rej.calm || 0) + 1; frontier = frontier.map(p => ({ ...p, h: h + dt })); continue; }
       frontier = [...next.values()];
       if (wave) for (const p of frontier) seen.add(p.c);
@@ -3705,7 +3719,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=182`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=183`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
