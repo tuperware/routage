@@ -676,3 +676,8 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 /* Route calculée : on relance depuis le résultat (« Relancer ») */
 .panel.has-result #go { opacity: .45; pointer-events: none; }
 #cmp-jump { display: none !important; }
+.cur-note.fia0 { background: #e8f5ec; color: #1f5a34; border: 1px solid #9fd1ae; }
+.cur-note.fia1 { background: #fff8e1; color: #6b4e00; border: 1px solid #e8cf7a; }
+.cur-note.fia small { display: block; opacity: .75; margin-top: 2px; }
+.pk-fia { font-weight: 600; }
+.pk-fia.fia0 { color: #1f7a3a; } .pk-fia.fia1 { color: #8a6400; } .pk-fia.fia2 { color: #b35c00; }

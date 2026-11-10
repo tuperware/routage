@@ -3054,6 +3054,57 @@
   el('wp-less').addEventListener('click', () => stepLevel(+1));
   el('wp-more').addEventListener('click', () => stepLevel(-1));
 
+  // Fiabilité de la prévision : 51 scénarios de l'ensemble ECMWF, sur une dizaine de points de la route.
+  // Plus les scénarios se ressemblent, plus la prévision est sûre. Simple indication.
+  async function fiabilite(r) {
+    const box = el('r-fia');
+    box.hidden = true;
+    try {
+      const L = r.legs.filter(n => !n.wait && n.h != null);
+      if (L.length < 2) return;
+      const pts = [];
+      for (let k = 0; k < 10; k++) pts.push(L[Math.round(k * (L.length - 1) / 9)]);
+      const uniq = pts.filter((n, i) => pts.indexOf(n) === i);
+      const ts = uniq.map(n => timeAt(n.h).getTime());
+      const d0 = new Date(Math.min(...ts)).toISOString().slice(0, 10), d1 = new Date(Math.max(...ts) + 3.6e6).toISOString().slice(0, 10);
+      const u = 'https://ensemble-api.open-meteo.com/v1/ensemble?latitude=' + uniq.map(n => n.lat.toFixed(3)).join(',') + '&longitude=' + uniq.map(n => n.lon.toFixed(3)).join(',') +
+        '&hourly=wind_speed_10m,wind_direction_10m&models=ecmwf_ifs025&wind_speed_unit=kn&timezone=GMT&start_date=' + d0 + '&end_date=' + d1;
+      const res = await fetch(u);
+      if (!res.ok || last !== r) return;
+      let js = await res.json();
+      if (!Array.isArray(js)) js = [js];
+      let sdMax = 0, dirMax = 0, p90 = 0, n = 0;
+      js.forEach((x, i) => {
+        const hh = x.hourly; if (!hh) return;
+        const t = Math.round((ts[i] - Date.parse(hh.time[0] + 'Z')) / 3.6e6);
+        if (!(t >= 0 && t < hh.time.length)) return;
+        const sp = [], dr = [];
+        Object.keys(hh).forEach(k => {
+          if (k.startsWith('wind_speed_10m') && hh[k][t] != null) sp.push(hh[k][t]);
+          if (k.startsWith('wind_direction_10m') && hh[k][t] != null) dr.push(hh[k][t]);
+        });
+        if (sp.length < 10) return;
+        n++;
+        const m = sp.reduce((a, b) => a + b, 0) / sp.length;
+        sdMax = Math.max(sdMax, Math.sqrt(sp.reduce((a, b) => a + (b - m) * (b - m), 0) / sp.length));
+        const srt = sp.slice().sort((a, b) => a - b); p90 = Math.max(p90, srt[Math.floor(srt.length * 0.9)]);
+        if (m >= 6 && dr.length >= 10) {
+          const cx = dr.reduce((a, b) => a + Math.cos(rad(b)), 0) / dr.length, sy = dr.reduce((a, b) => a + Math.sin(rad(b)), 0) / dr.length;
+          const R = Math.min(1, Math.hypot(cx, sy));
+          dirMax = Math.max(dirMax, deg(Math.sqrt(-2 * Math.log(Math.max(1e-6, R)))));
+        }
+      });
+      if (n < 3 || last !== r) return;
+      const lvl = sdMax <= 2 && dirMax <= 20 ? 0 : sdMax <= 4 && dirMax <= 40 ? 1 : 2;
+      const lab = ['Prévision sûre', 'Prévision moyenne', 'Prévision incertaine'][lvl];
+      const why = ['les scénarios météo se ressemblent', 'les scénarios météo divergent un peu', 'les scénarios météo divergent beaucoup : revérifiez avant de partir'][lvl];
+      box.className = 'cur-note fia fia' + lvl + (lvl === 2 ? ' warn' : '');
+      box.innerHTML = `<b>${lab}</b> : ${why}. Écart du vent jusqu'à ±${nf0.format(sdMax)} nds et ±${nf0.format(dirMax)}° ; 1 scénario sur 10 donne plus de ${nf0.format(p90)} nds. <small>Ensemble ECMWF, 51 scénarios.</small>`;
+      box.hidden = false;
+      const pk = el('peek').querySelector('small');
+      if (pk && !pk.querySelector('.pk-fia')) pk.insertAdjacentHTML('beforeend', ` · <span class="pk-fia fia${lvl}">${lab.toLowerCase()}</span>`);
+    } catch (e) { box.hidden = true; }
+  }
   function showResult() {
     planDraw();
     el('r-tstart').value = ui.tStart.value;
@@ -3107,6 +3158,7 @@
     r.statsA = routeStats(r);
     clearCompare(); fillCompareSelect();
     nightNote(r);
+    fiabilite(r);
     if (typeof gpsTrack === 'function') gpsTrack();
 
     ui.scrub.min = '0'; ui.scrub.max = '1000'; ui.scrub.value = '0';
@@ -3653,7 +3705,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=181`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=182`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
