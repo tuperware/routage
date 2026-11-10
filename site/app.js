@@ -3673,6 +3673,7 @@
     el('o-pk').dataset.v = b.dataset.v; saveOpt();
   }));
   el('o-x-change').addEventListener('click', () => { el('o-x-pick').hidden = !el('o-x-pick').hidden; });
+  el('o-close').addEventListener('click', () => { const d = el('settings'); d.open = false; d.scrollIntoView({ block: 'nearest' }); });
   el('o-x-file').addEventListener('click', () => { el('o-x-pick').hidden = true; el('o-file').click(); });
   // Exemple : polaire Oceanis 43 de la bibliothèque OpenCPN Weather Routing (GPL-3.0)
   el('o-mono').addEventListener('click', async () => {
@@ -3734,7 +3735,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=188`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=189`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
