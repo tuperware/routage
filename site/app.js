@@ -2806,6 +2806,8 @@
   }
 
   el('cmp-go').addEventListener('click', runCompare);
+  el('cmp-model').addEventListener('change', cmpLabel);
+  el('cmp-other').addEventListener('click', () => { el('cmp-model').hidden = false; el('cmp-other').hidden = true; el('cmp-model').focus(); });
 
   // ---------- Meilleure heure de départ : on recalcule la route toutes les 3 h sur 2 jours ----------
   let bestRun = 0;
@@ -3308,10 +3310,20 @@
   function fillCompareSelect() {
     const sel = el('cmp-model'); if (!sel || !last) return;
     sel.innerHTML = MODELS.filter(m => m.id !== last.modelId).map(m => `<option value="${m.id}">${m.name}${m.note ? ' · ' + m.note : ''}</option>`).join('');
-    // AROME ↔ ARPEGE (les deux de Météo-France), sinon ECMWF (ou GFS si on part d'ECMWF)
-    const pairs = { meteofrance_arome_france_hd: 'meteofrance_seamless', meteofrance_seamless: 'meteofrance_arome_france_hd', ecmwf_ifs: 'gfs_seamless' };
-    const pref = pairs[last.modelId] || 'ecmwf_ifs';
-    if (MODELS.some(m => m.id === pref)) sel.value = pref;
+    // Choix automatique : AROME près des côtes françaises sur 2 jours, sinon ICON, GFS au-delà de 7 jours
+    const arr = +last.tStart + (last.dur || 0) * 3.6e6, hEnd = (arr - Date.now()) / 3.6e6;
+    const ar = MODELS.find(m => m.id === 'meteofrance_arome_france_hd'), A = ar && ar.area;
+    const inAr = A && last.legs && last.legs.every(q => q.lat >= A.s && q.lat <= A.n && q.lon >= A.w && q.lon <= A.e);
+    const order = inAr && hEnd <= 48 ? ['meteofrance_arome_france_hd', 'icon_seamless', 'ecmwf_ifs']
+      : hEnd > 7 * 24 ? ['gfs_seamless', 'ecmwf_ifs'] : ['icon_seamless', 'ecmwf_ifs'];
+    const pref = order.find(id => id !== last.modelId && MODELS.some(m => m.id === id));
+    if (pref) sel.value = pref;
+    sel.hidden = true; el('cmp-other').hidden = false;
+    cmpLabel();
+  }
+  function cmpLabel() {
+    const m = MODELS.find(x => x.id === el('cmp-model').value);
+    el('cmp-go').textContent = `Comparer avec ${m ? m.name : 'un autre modèle'}`;
   }
   function maxGap(A, B) {
     // plus grand écart (milles) entre la route B et la route A
@@ -3364,10 +3376,10 @@
     if (A.wName && A.wName === B.wName && A.wName !== 'Open-Meteo') p.push(`Les vagues viennent du même modèle (${A.wName}) pour les deux : les écarts de vagues ne viennent que des routes différentes.`);
     const hs = [A.hsMax, B.hsMax, B.same && B.same.maxB].filter(x => x != null);
     p.push(`Par prudence, préparez le bateau pour le pire des deux : vent ${nf0.format(Math.max(A.twsMax, B.twsMax))} nds${hs.length ? `, vagues ${nf1.format(Math.max(...hs))} m` : ''}.`);
-    const verdict = adh <= 1 && gap < 5 ? `Les deux modèles sont d'accord.` : adh <= 3 && gap < 15 ? `Les deux modèles sont assez proches.` : `Les deux modèles ne sont pas d'accord : prévision incertaine.`;
-    const r2 = (k, a, b) => `<tr><th>${k}</th><td>${a}</td><td>${b}</td></tr>`;
-    const hsTxt = x => (x == null ? '–' : `${nf1.format(x)} m`);
-    el('cmp-out').innerHTML = `<table class="cmp-tab"><thead><tr><th></th><th><span class="lg lg-sail"></span>${A.model}</th><th><span class="lg lg-b"></span>${B.model}</th></tr></thead><tbody>${r2('Durée', fmtDur(A.dur), fmtDur(B.dur))}${r2('Arrivée', hfmt.format(A.arr), hfmt.format(B.arr))}${r2('Vent max', `${nf0.format(A.twsMax)} nds`, `${nf0.format(B.twsMax)} nds`)}${r2('Vagues max', hsTxt(A.hsMax), hsTxt(B.hsMax))}</tbody></table><p class="an-note">${verdict} Route ${B.model} en violet pointillé sur la carte.</p><button type="button" class="btn-primary btn-use" id="cmp-use">Prendre la route ${B.model}</button>`;
+    const verdict = adh <= 1 && gap < 5 ? `Les deux modèles sont d'accord.` : adh <= 3 && gap < 15 ? `Modèles assez proches.` : `Modèles pas d'accord : prévision incertaine.`;
+    const ecart = adh < 1 / 6 ? 'même heure d’arrivée' : `${fmtDur(adh)} ${dh < 0 ? 'plus tôt' : 'plus tard'}`;
+    const vent = Math.round(A.twsMax) === Math.round(B.twsMax) ? `vent max ${nf0.format(B.twsMax)} nds aussi` : `vent max ${nf0.format(B.twsMax)} nds au lieu de ${nf0.format(A.twsMax)}`;
+    el('cmp-out').innerHTML = `<p class="cmp-line"><span class="lg lg-b"></span><b>${B.model} : ${fmtDur(B.dur)}</b> (${ecart}), ${vent}. ${verdict}</p><button type="button" class="btn-primary btn-use" id="cmp-use">Prendre la route ${B.model}</button>`;
     el('cmp-use').addEventListener('click', useCompare);
     map.getSource('route2') && map.getSource('route2').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: B.pts.map(q => [q.lon, q.lat]) }, properties: {} });
   }
@@ -3738,7 +3750,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=190`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=191`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }

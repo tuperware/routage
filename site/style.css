@@ -697,3 +697,9 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 .cmp-simple #cmp-out .btn-use { margin-top: 8px; }
 .cmp-simple { min-width: 0; max-width: 100%; }
 .cmp-simple .cmp-row select { width: 0; flex: 1 1 auto; }
+.cmp-simple .cmp-go { width: 100%; height: 52px; margin: 0; }
+.cmp-simple .cmp-sel { display: block; width: 100%; height: 48px; margin-top: 6px; font: inherit; font-size: var(--text-sm); border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); padding: 0 8px; }
+.cmp-simple .cmp-sel[hidden], .cmp-simple .cmp-other[hidden] { display: none; }
+.cmp-simple .cmp-other { display: block; margin: 2px auto 0; min-height: 40px; padding: 0 12px; font: inherit; font-size: var(--text-sm); color: var(--sea); background: none; border: 0; text-decoration: underline; cursor: pointer; }
+.cmp-line { margin: 8px 0 0; font-size: var(--text-sm); line-height: 1.45; }
+.cmp-line .lg { margin-right: 6px; }
