@@ -2793,9 +2793,24 @@
   // « Prendre cette route » : le modèle comparé devient la route principale (feuille de route, voilure, GPX).
   // L'ancienne route reste tracée en violet pour comparaison.
   let cmpId = null;
+  let cmpData = null;
   async function useCompare() {
     const oldId = model, newId = cmpId;
     if (!newId || !last) return;
+    if (cmpData && cmpData.id === newId && cmpData.r) {
+      // Route déjà calculée par la comparaison : on échange les deux, sans rien recalculer
+      const A = { r: last, env: { wind, waves, currents }, id: oldId }, statsA = last.statsA || routeStats(last);
+      wind = cmpData.env.wind; waves = cmpData.env.waves; currents = cmpData.env.currents;
+      ui.models.value = newId; model = newId;
+      last = cmpData.r; last.statsA = routeStats(last);
+      showResult();
+      const sel = el('cmp-model');
+      if (sel && [...sel.options].some(o => o.value === oldId)) { sel.value = oldId; cmpLabel(); }
+      cmpData = A; cmpId = oldId; cmp = statsA;
+      showCompare(last.statsA, statsA);
+      say(`Route ${last.model} retenue : feuille de route, voilure et GPX la suivent maintenant.`);
+      return;
+    }
     ui.models.value = newId; model = newId;
     el('cmp-out').innerHTML = '<p class="an-note">Calcul de la route choisie…</p>';
     await runMain();
@@ -3303,7 +3318,7 @@
   }
   let cmp = null;
   function clearCompare() {
-    cmp = null;
+    cmp = null; cmpData = null;
     const o = el('cmp-out'); if (o) o.innerHTML = '';
     map.getSource('route2') && map.getSource('route2').setData(EMPTY);
   }
@@ -3411,6 +3426,7 @@
             gapH: sA[iMax].h, gapA: sA[iMax].hs, gapB: sB[iMax].hs };
         }
       }
+      cmpData = { r: rB, env: { wind, waves, currents }, id };
       wind = keep.wind; waves = keep.waves; currents = keep.currents;
       cmp = B;
       showCompare(last.statsA, B);
@@ -3750,7 +3766,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=191`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=192`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
