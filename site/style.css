@@ -703,3 +703,4 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 .cmp-simple .cmp-other { display: block; margin: 2px auto 0; min-height: 40px; padding: 0 12px; font: inherit; font-size: var(--text-sm); color: var(--sea); background: none; border: 0; text-decoration: underline; cursor: pointer; }
 .cmp-line { margin: 8px 0 0; font-size: var(--text-sm); line-height: 1.45; }
 .cmp-line .lg { margin-right: 6px; }
+.set-auto { margin: 10px 0 0; text-align: center; font-size: var(--text-xs); color: var(--muted); }
