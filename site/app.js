@@ -3364,7 +3364,10 @@
     if (A.wName && A.wName === B.wName && A.wName !== 'Open-Meteo') p.push(`Les vagues viennent du même modèle (${A.wName}) pour les deux : les écarts de vagues ne viennent que des routes différentes.`);
     const hs = [A.hsMax, B.hsMax, B.same && B.same.maxB].filter(x => x != null);
     p.push(`Par prudence, préparez le bateau pour le pire des deux : vent ${nf0.format(Math.max(A.twsMax, B.twsMax))} nds${hs.length ? `, vagues ${nf1.format(Math.max(...hs))} m` : ''}.`);
-    el('cmp-out').innerHTML = t + `<ul>${p.map(x => `<li>${x}</li>`).join('')}</ul><p class="an-note">La route ${B.model} est tracée en violet pointillé sur la carte. La feuille de route et le GPX sont pour l'instant ceux ${/^[AEIOUY]/.test(A.model) ? "d'" : 'de '}${A.model}.</p><button type="button" class="btn-primary btn-use" id="cmp-use">Prendre la route ${B.model}</button><p class="an-note">Feuille de route, plan de voilure et GPX suivront alors la route ${B.model}.</p>`;
+    const verdict = adh <= 1 && gap < 5 ? `Les deux modèles sont d'accord.` : adh <= 3 && gap < 15 ? `Les deux modèles sont assez proches.` : `Les deux modèles ne sont pas d'accord : prévision incertaine.`;
+    const r2 = (k, a, b) => `<tr><th>${k}</th><td>${a}</td><td>${b}</td></tr>`;
+    const hsTxt = x => (x == null ? '–' : `${nf1.format(x)} m`);
+    el('cmp-out').innerHTML = `<table class="cmp-tab"><thead><tr><th></th><th><span class="lg lg-sail"></span>${A.model}</th><th><span class="lg lg-b"></span>${B.model}</th></tr></thead><tbody>${r2('Durée', fmtDur(A.dur), fmtDur(B.dur))}${r2('Arrivée', hfmt.format(A.arr), hfmt.format(B.arr))}${r2('Vent max', `${nf0.format(A.twsMax)} nds`, `${nf0.format(B.twsMax)} nds`)}${r2('Vagues max', hsTxt(A.hsMax), hsTxt(B.hsMax))}</tbody></table><p class="an-note">${verdict} Route ${B.model} en violet pointillé sur la carte.</p><button type="button" class="btn-primary btn-use" id="cmp-use">Prendre la route ${B.model}</button>`;
     el('cmp-use').addEventListener('click', useCompare);
     map.getSource('route2') && map.getSource('route2').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: B.pts.map(q => [q.lon, q.lat]) }, properties: {} });
   }
@@ -3735,7 +3738,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=189`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=190`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }

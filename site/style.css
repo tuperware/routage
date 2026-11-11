@@ -631,7 +631,7 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 .night-btn { min-height: 46px; padding: 8px 12px; font: inherit; font-weight: 600; color: var(--sea); background: var(--surface); border: 1px solid currentColor; border-radius: 10px; cursor: pointer; text-align: left; }
 .best-row.day { border: 2px solid #c8962a; background: #fdf6e6; }
 #best-go, #best-out { display: none !important; }
-.tz-seg, #cmp-box, #tabs [data-t="analyse"] { display: none !important; }
+.tz-seg, #tabs [data-t="analyse"] { display: none !important; }
 .tide-sonde.need .num input { border: 2px solid #d9822b; background: #fff6ec; }
 .tide-warn { margin: 0 0 6px; padding: 6px 8px; border-radius: 8px; background: #fff6ec; color: #8a4b0f; font-size: 13px; font-weight: 600; line-height: 1.3; }
 .tide-warn[hidden], .tide-now[hidden] { display: none; }
@@ -692,3 +692,8 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 }
 .go-row .btn-reset, #reset { color: #c62828; border-color: #e3a3a3; background: #fff5f5; }
 .go-row .btn-reset svg { stroke: currentColor; }
+.cmp-simple { margin: 10px 0 4px; }
+.cmp-simple .cmp-row { margin-top: 0; }
+.cmp-simple #cmp-out .btn-use { margin-top: 8px; }
+.cmp-simple { min-width: 0; max-width: 100%; }
+.cmp-simple .cmp-row select { width: 0; flex: 1 1 auto; }
