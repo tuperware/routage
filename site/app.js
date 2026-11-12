@@ -573,7 +573,8 @@
   }
   function hazLand(lat, lon) {
     if (!hazOn || !fineOn || chanMode || narrowOk) return false;
-    if (!coastLim(lat, lon)) return false; // près du départ, de l'arrivée et des points : pas de contrôle
+    // près du départ, de l'arrivée et des points : pas de contrôle des fonds sur 0,2 M seulement (sortie de port)
+    for (const q of coastNear) { const dy = lat - q.lat, dx = (lon - q.lon) * Math.cos(rad(q.lat)); if (dy * dy + dx * dx < (0.2 / 60) * (0.2 / 60)) return false; }
     const t = fineKey(lat, lon), m = hazMask(t.k);
     if (!m || m === 'S') return false;
     const px = Math.min(FN - 1, Math.floor((t.x % 1) * FN)), py = Math.min(FN - 1, Math.floor((t.y % 1) * FN));
@@ -3765,7 +3766,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=193`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=194`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
