@@ -554,7 +554,7 @@
   }
   function hazMask(k) {
     const h = haz.get(k); if (!h) return null;
-    const dm = OPT.dmin || 0;
+    const dm = hazDm != null ? hazDm : OPT.dmin || 0;
     if (h.m && h.dm === dm) return h.m;
     const m = new Uint8Array(FN * FN); let any = 0;
     if (h.e && dm > 0) for (let i = 0; i < m.length; i++) { const v = h.e[i]; if (v !== 0 && v > -dm) { m[i] = 1; any++; } }
@@ -571,13 +571,37 @@
     h.m = any ? m : 'S'; h.dm = dm;
     return h.m;
   }
+  // Masque des seuls dangers balisés (cardinales, roches, épaves), sans les fonds
+  function hazPtsMask(k) {
+    const h = haz.get(k); if (!h) return null;
+    const dm = OPT.dmin || 0;
+    if (h.mp && h.dmp === dm) return h.mp;
+    const m = new Uint8Array(FN * FN); let any = 0;
+    const [, y] = k.split('/'), n = 1 << FZ, latC = Math.atan(Math.sinh(Math.PI * (1 - 2 * (+y + 0.5) / n))) * 180 / Math.PI;
+    const pxM = 40075016.7 * Math.cos(rad(latC)) / (n * FN);
+    for (const q of h.pts) {
+      if (q.depth != null && q.kind === 'iso' && q.depth >= dm + 1) continue;
+      const R = (q.kind === 'iso' ? 100 : 150) / pxM, off = q.kind === 'iso' ? 0 : 150 / pxM;
+      const cx = q.x * FN + (q.kind === 'east' ? -off : q.kind === 'west' ? off : 0), cy = q.y * FN + (q.kind === 'north' ? off : q.kind === 'south' ? -off : 0);
+      for (let yy = Math.max(0, Math.floor(cy - R)); yy <= Math.min(FN - 1, Math.ceil(cy + R)); yy++)
+        for (let xx = Math.max(0, Math.floor(cx - R)); xx <= Math.min(FN - 1, Math.ceil(cx + R)); xx++)
+          if ((xx + 0.5 - cx) ** 2 + (yy + 0.5 - cy) ** 2 <= R * R) { m[yy * FN + xx] = 1; any++; }
+    }
+    h.mp = any ? m : 'S'; h.dmp = dm;
+    return h.mp;
+  }
+  let hazDm = null; // seuil de profondeur réduit pour un recours (zones qui découvrent seulement)
+  let hazPtsOnly = false; // dernier recours : fonds ignorés partout, dangers balisés gardés
   let hazR = 1; // rayon sans contrôle des fonds autour des points, en milles
   function hazLand(lat, lon) {
     if (!hazOn || !fineOn || chanMode || narrowOk) return false;
     if (chanMode) return false;
     // près du départ, de l'arrivée et des points : pas de contrôle (1 M, élargi si un petit fond ferme la sortie)
-    for (const q of coastNear) { const dy = lat - q.lat, dx = (lon - q.lon) * Math.cos(rad(q.lat)); if (dy * dy + dx * dx < (hazR / 60) * (hazR / 60)) return false; }
-    const t = fineKey(lat, lon), m = hazMask(t.k);
+    let d2 = Infinity;
+    for (const q of coastNear) { const dy = lat - q.lat, dx = (lon - q.lon) * Math.cos(rad(q.lat)); d2 = Math.min(d2, dy * dy + dx * dx); }
+    if (d2 < 1 / 3600) return false;
+    // zone élargie (estuaire) : fonds ignorés, dangers balisés toujours évités
+    const t = fineKey(lat, lon), m = hazPtsOnly || d2 < (hazR / 60) * (hazR / 60) ? hazPtsMask(t.k) : hazMask(t.k);
     if (!m || m === 'S') return false;
     const px = Math.min(FN - 1, Math.floor((t.x % 1) * FN)), py = Math.min(FN - 1, Math.floor((t.y % 1) * FN));
     return m[py * FN + px] === 1;
@@ -2698,6 +2722,17 @@
           }
         }
       }
+      if (fineOn && hazOn && !hazPtsOnly && hazDm == null && (r.error === 'stuck' || r.error === 'blocked')) {
+        // Petits fonds partout sur le passage : fonds ignorés, dangers balisés toujours évités (avant le passage étroit, qui ne contrôle rien)
+        say('Petits fonds sur le passage, nouveau calcul…');
+        // d'abord : seulement les zones qui découvrent, au-delà de 6 M des points
+        hazDm = 0.3; hazR = 6;
+        try { const r6 = await leg(start, end, s0, e0, h0, deep); if (!r6.error) { r = r6; hazCut = true; } } finally { hazDm = null; hazR = 1; }
+        if (r.error === 'stuck' || r.error === 'blocked') {
+          hazPtsOnly = true;
+          try { const r5 = await leg(start, end, s0, e0, h0, deep); if (!r5.error) { r = r5; hazCut = true; } } finally { hazPtsOnly = false; }
+        }
+      }
       if (deep < 2 && fineOn && (r.error === 'stuck' || r.error === 'blocked')) {
         // Plan d'eau relié par un passage étroit (étang de Berre par le canal de Caronte…) :
         // route normale jusqu'à l'entrée du passage, le passage au plus court, puis route normale.
@@ -3785,7 +3820,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=196`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=197`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
