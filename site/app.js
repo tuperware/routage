@@ -571,9 +571,12 @@
     h.m = any ? m : 'S'; h.dm = dm;
     return h.m;
   }
+  let hazR = 1; // rayon sans contrôle des fonds autour des points, en milles
   function hazLand(lat, lon) {
     if (!hazOn || !fineOn || chanMode || narrowOk) return false;
-    if (!coastLim(lat, lon)) return false; // près du départ, de l'arrivée et des points : pas de contrôle
+    if (chanMode) return false;
+    // près du départ, de l'arrivée et des points : pas de contrôle (1 M, élargi si un petit fond ferme la sortie)
+    for (const q of coastNear) { const dy = lat - q.lat, dx = (lon - q.lon) * Math.cos(rad(q.lat)); if (dy * dy + dx * dx < (hazR / 60) * (hazR / 60)) return false; }
     const t = fineKey(lat, lon), m = hazMask(t.k);
     if (!m || m === 'S') return false;
     const px = Math.min(FN - 1, Math.floor((t.x % 1) * FN)), py = Math.min(FN - 1, Math.floor((t.y % 1) * FN));
@@ -2648,6 +2651,23 @@
         r = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement de la côte… ${Math.round(f * 100)} %`); });
         if (r.error === 'stuck' || r.error === 'blocked') r = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement de la côte… ${Math.round(f * 100)} %`); }, 'wave');
       }
+      if (fineOn && hazOn && (r.error === 'stuck' || r.error === 'blocked')) {
+        // Départ ou arrivée dans un estuaire peu profond : fonds ignorés plus loin autour d'eux (3 puis 6 M), le reste du trajet contrôlé
+        for (const R of [3, 6]) {
+          hazR = R;
+          try {
+            say('Petits fonds près du départ ou de l\u2019arrivée, nouveau calcul…');
+            let r4 = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement des petits fonds… ${Math.round(f * 100)} %`); });
+            if (r4.error === 'stuck' || r4.error === 'blocked') r4 = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement des petits fonds… ${Math.round(f * 100)} %`); }, 'wave');
+            for (let it = 0; it < 3 && !r4.error; it++) {
+              const added = await loadFineKeys(fineKeysAlong(r4.legs)) + await loadHazKeys(keysAlong(r4.legs));
+              if (!added || routeClear(r4.legs)) break;
+              r4 = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement des petits fonds… ${Math.round(f * 100)} %`); });
+            }
+            if (!r4.error) { r = r4; hazCut = true; break; }
+          } finally { hazR = 1; }
+        }
+      }
       if (fineOn && coastM > 50 && (r.error === 'stuck' || r.error === 'blocked')) {
         // Passage trop étroit pour la distance à la côte choisie : on retente à 50 m
         coastM = 50; coastCut = true;
@@ -3765,7 +3785,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=195`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=196`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
