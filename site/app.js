@@ -552,6 +552,23 @@
     for (let i = 0; i < todo.length; i += 8) await Promise.all(todo.slice(i, i + 8).map(k => loadHazTile(k).catch(() => {})));
     return todo.length;
   }
+  // Dangers balisés : cercle de 100 m (danger isolé, roche, épave) ; cardinale : bande de 150 m de large de chaque côté,
+  // de la marque jusqu'à 600 m côté danger (la roche se trouve souvent à plusieurs centaines de mètres de la bouée)
+  function hazPtsDraw(m, h, dm, pxM) {
+    let any = 0;
+    for (const q of h.pts) {
+      if (q.depth != null && q.kind === 'iso' && q.depth >= dm + 1) continue;
+      const R = (q.kind === 'iso' ? 100 : 150) / pxM, L = q.kind === 'iso' ? 0 : 600 / pxM;
+      const ux = q.kind === 'east' ? -1 : q.kind === 'west' ? 1 : 0, uy = q.kind === 'north' ? 1 : q.kind === 'south' ? -1 : 0;
+      const ax = q.x * FN, ay = q.y * FN, bx = ax + ux * L, by = ay + uy * L;
+      for (let yy = Math.max(0, Math.floor(Math.min(ay, by) - R)); yy <= Math.min(FN - 1, Math.ceil(Math.max(ay, by) + R)); yy++)
+        for (let xx = Math.max(0, Math.floor(Math.min(ax, bx) - R)); xx <= Math.min(FN - 1, Math.ceil(Math.max(ax, bx) + R)); xx++) {
+          const px = xx + 0.5 - ax, py = yy + 0.5 - ay, t = L ? Math.max(0, Math.min(L, px * ux + py * uy)) : 0;
+          if ((px - ux * t) ** 2 + (py - uy * t) ** 2 <= R * R) { if (!m[yy * FN + xx]) any++; m[yy * FN + xx] = 1; }
+        }
+    }
+    return any;
+  }
   function hazMask(k) {
     const h = haz.get(k); if (!h) return null;
     const dm = hazDm != null ? hazDm : OPT.dmin || 0;
@@ -560,14 +577,7 @@
     if (h.e && dm > 0) for (let i = 0; i < m.length; i++) { const v = h.e[i]; if (v !== 0 && v > -dm) { m[i] = 1; any++; } }
     const [, y] = k.split('/'), n = 1 << FZ, latC = Math.atan(Math.sinh(Math.PI * (1 - 2 * (+y + 0.5) / n))) * 180 / Math.PI;
     const pxM = 40075016.7 * Math.cos(rad(latC)) / (n * FN);
-    for (const q of h.pts) {
-      if (q.depth != null && q.kind === 'iso' && q.depth >= dm + 1) continue;
-      const R = (q.kind === 'iso' ? 100 : 150) / pxM, off = q.kind === 'iso' ? 0 : 150 / pxM;
-      const cx = q.x * FN + (q.kind === 'east' ? -off : q.kind === 'west' ? off : 0), cy = q.y * FN + (q.kind === 'north' ? off : q.kind === 'south' ? -off : 0);
-      for (let yy = Math.max(0, Math.floor(cy - R)); yy <= Math.min(FN - 1, Math.ceil(cy + R)); yy++)
-        for (let xx = Math.max(0, Math.floor(cx - R)); xx <= Math.min(FN - 1, Math.ceil(cx + R)); xx++)
-          if ((xx + 0.5 - cx) ** 2 + (yy + 0.5 - cy) ** 2 <= R * R) { m[yy * FN + xx] = 1; any++; }
-    }
+    any += hazPtsDraw(m, h, dm, pxM);
     h.m = any ? m : 'S'; h.dm = dm;
     return h.m;
   }
@@ -579,14 +589,7 @@
     const m = new Uint8Array(FN * FN); let any = 0;
     const [, y] = k.split('/'), n = 1 << FZ, latC = Math.atan(Math.sinh(Math.PI * (1 - 2 * (+y + 0.5) / n))) * 180 / Math.PI;
     const pxM = 40075016.7 * Math.cos(rad(latC)) / (n * FN);
-    for (const q of h.pts) {
-      if (q.depth != null && q.kind === 'iso' && q.depth >= dm + 1) continue;
-      const R = (q.kind === 'iso' ? 100 : 150) / pxM, off = q.kind === 'iso' ? 0 : 150 / pxM;
-      const cx = q.x * FN + (q.kind === 'east' ? -off : q.kind === 'west' ? off : 0), cy = q.y * FN + (q.kind === 'north' ? off : q.kind === 'south' ? -off : 0);
-      for (let yy = Math.max(0, Math.floor(cy - R)); yy <= Math.min(FN - 1, Math.ceil(cy + R)); yy++)
-        for (let xx = Math.max(0, Math.floor(cx - R)); xx <= Math.min(FN - 1, Math.ceil(cx + R)); xx++)
-          if ((xx + 0.5 - cx) ** 2 + (yy + 0.5 - cy) ** 2 <= R * R) { m[yy * FN + xx] = 1; any++; }
-    }
+    any += hazPtsDraw(m, h, dm, pxM);
     h.mp = any ? m : 'S'; h.dmp = dm;
     return h.mp;
   }
@@ -3820,7 +3823,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=197`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=198`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
