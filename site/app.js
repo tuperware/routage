@@ -713,6 +713,48 @@
       return out;
     } finally { chanMode = false; }
   }
+  // Longue attente au près dans une zone étroite (approche de Camaret, golfe du Morbihan…) : on tire des bords
+  // le long du même tracé (ou moteur s'il est autorisé) si cela arrive plus tôt, sans dépasser vent max et vagues max
+  // Passages à fort courant de marée connus : le modèle à 8 km les lisse beaucoup (positions et rayons approximatifs, en km)
+  const RAZ = [
+    ['le raz Blanchard', 49.705, -2.05, 10], ['le raz de Barfleur', 49.70, -1.23, 6],
+    ['le raz de Sein', 48.04, -4.76, 5], ['le chenal du Four', 48.40, -4.80, 9], ['le passage du Fromveur', 48.44, -5.03, 5],
+    ['le goulet de Brest', 48.34, -4.60, 3], ['le chenal de l\u2019île de Batz', 48.74, -4.00, 4],
+    ['l\u2019entrée du golfe du Morbihan', 47.55, -2.92, 4], ['le golfe du Morbihan', 47.59, -2.83, 8],
+    ['le passage de la Teignouse', 47.45, -3.05, 3], ['le pertuis de Maumusson', 45.78, -1.22, 4],
+  ];
+  function razOn(legs) {
+    const out = [];
+    for (const [n, la, lo, km] of RAZ) {
+      const R = km / 1.852;
+      for (let i = 0; i < legs.length; i++) { const l = legs[i]; if (Math.hypot(l.lat - la, (l.lon - lo) * Math.cos(rad(la))) * 60 < R) { out.push(n); break; } }
+    }
+    return out.some(n => n.includes('entrée du golfe')) ? out.filter(n => n !== 'le golfe du Morbihan') : out;
+  }
+  function fixWaits(r, h0) {
+    for (let it = 0; it < 3; it++) {
+      const L = r.legs;
+      const i = L.findIndex((l, k) => l.wait && k < L.length - 1 && L[k + 1].h - l.h > 1);
+      if (i < 0 || L.slice(i).some(l => l.via)) return;
+      const rest = L.slice(i + 1).filter((l, k, A) => k === A.length - 1 || !l.wait)
+        .filter((q, k, A) => distNm(k ? A[k - 1] : L[i], q) > 0.01).map(l => ({ lat: l.lat, lon: l.lon }));
+      if (!rest.length) return;
+      // départ des bords : au point d'attente, ou plus tôt si la ligne droite vers la suite est libre (évite d'aller trop loin)
+      let best = null;
+      for (let j = i; j >= Math.max(0, i - 12); j--) {
+        if (L[j].wait && j < i) break;
+        if (j < i && !segmentClear(L[j], rest[0])) continue;
+        const C = chanLegs([{ lat: L[j].lat, lon: L[j].lon }, ...rest], L[j].h);
+        if (!C || C.legs.some(l => (l.tws != null && l.tws > OPT.wmax) || (l.wv && l.wv.hs > OPT.hmax + 0.05))) continue;
+        if (!best || C.h < best.C.h) best = { j, C };
+      }
+      if (!best || best.C.h >= L[L.length - 1].h - 0.25) return;
+      const C = best.C;
+      let dist = 0; const legs = [...L.slice(0, best.j), ...C.legs];
+      for (let k = 1; k < legs.length; k++) dist += distNm(legs[k - 1], legs[k]);
+      r.legs = legs; r.dist = dist; r.dur = C.h - h0;
+    }
+  }
   // Bords du chenal : à la voile si possible, sinon au louvoyage (VMG) ou au moteur s'il est autorisé
   function chanLegs(pts, t) {
     const legs = [];
@@ -2827,6 +2869,7 @@
       if (r.error && r.rej && r.rej.land > 0) throw new Error(segTxt + 'Pas de route trouvée : la terre bloque le passage. Placez le départ et l\u2019arrivée bien en mer, ou ajoutez un point de passage.');
       if (r.error) throw new Error(segTxt + 'Pas de route trouvée : pas assez de vent sur le trajet. Autorisez le moteur (Réglages bateau) ou changez l\u2019heure de départ.');
 
+      fixWaits(r, h0);
       return { ...r, t0: wind.t0, h0, tStart, model: mName, modelId: model, wName, snapped: S0.some(x => x.moved > 0.05), coastCut: coastCut || !fineOn, hazCut, dmin: OPT.dmin, coastM: OPT.coast, noWaves: !waves, wind, waves, currents, useCur: !!(OPT.cur && currents) };
   }
 
@@ -3241,6 +3284,11 @@
     } else if (OPT.cur) {
       rc.className = 'cur-note'; rc.textContent = 'Courant : pas de donnée pour ce trajet ou cette date (prévision sur 10 jours). Route calculée sans courant.'; rc.hidden = false;
     } else rc.hidden = true;
+    const rz = razOn(r.legs);
+    if (rz.length) {
+      const txt = `<b>Passage à fort courant : ${rz.join(', ')}.</b> Le courant réel y est bien plus fort que dans le modèle : vérifiez l\u2019heure de passage avec l\u2019annuaire des marées et les cartes de courants.`;
+      rc.className = 'cur-note warn'; rc.innerHTML = rc.hidden ? txt : `${txt}<br>${rc.innerHTML}`; rc.hidden = false;
+    }
     drawWaypoints();
     try { analyse(r); } catch (e) { el('analyse').textContent = ''; }
     try { r.sails = showSailPlan(r); } catch (e) { console.error(e); }
@@ -3823,7 +3871,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=200`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=201`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
