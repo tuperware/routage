@@ -1200,6 +1200,8 @@
     let frontier = [{ ...start, h: h0, parent: null }];
     const isos = [];
     let best = null, horizon = false, minD = Infinity, hImprove = h0;
+    // patience avant d'abandonner (route bloquée) : 8 h pour une route courte, 24 h au plus (le double en mode vague)
+    const patience = Math.min(24, Math.max(8, distNm(start, end) / 2));
     // Pourquoi ça bloque : compte des refus par vent, vagues, terre
     const rej = { wind: 0, wave: 0, land: 0, windMin: Infinity, waveMin: Infinity };
     const maxSteps = Math.floor((wind.nt - 1 - h0) / dt);
@@ -1250,14 +1252,14 @@
       // Calme plat partout : on attend sur place le retour du vent au lieu d'abandonner
       // Le bateau avance mais toutes les cases accessibles sont déjà vues : bloqué par la côte, pas un calme
       if (!next.size && frontier.length && moving > 0 && rej.wave === wave0) return { error: 'stuck', isos, rej };
-      if (!next.size && frontier.length && rej.land === land0 && rej.wave === wave0) { rej.calm = (rej.calm || 0) + 1; frontier = frontier.map(p => ({ ...p, h: h + dt })); continue; }
+      if (!next.size && frontier.length && rej.land === land0 && rej.wave === wave0) { rej.calm = (rej.calm || 0) + 1; hImprove += dt; frontier = frontier.map(p => ({ ...p, h: h + dt })); continue; }
       frontier = [...next.values()];
       if (wave) for (const p of frontier) seen.add(p.c);
       if (!frontier.length) break;
       if (frontier.length > 5000) frontier = frontier.sort((x, y) => x.dE - y.dE).slice(0, 5000);
       const dMin = Math.min(...frontier.map(p => p.dE));
       if (dMin < minD - 0.5) { minD = dMin; hImprove = h; }
-      else if (h - hImprove > (wave ? 48 : 24)) return { error: 'stuck', isos, rej };
+      else if (h - hImprove > (wave ? 2 : 1) * patience) return { error: 'stuck', isos, rej };
       isos.push(frontier.map(p => [p.lon, p.lat, bearing(start, p)]).sort((x, y) => x[2] - y[2]));
       if (k % 3 === 0) { onStep && onStep(k / maxSteps, isos); await new Promise(r => setTimeout(r, 0)); }
     }
@@ -2749,9 +2751,7 @@
       if (fineOn && hazOn && (r.error === 'stuck' || r.error === 'blocked')) {
         // Départ ou arrivée dans un estuaire peu profond : fonds ignorés plus loin autour du seul point qui bloque
         // (départ, puis arrivée, puis les deux), avec le plus petit rayon possible (2, 3 puis 6 M) ; le reste du trajet contrôlé
-        const tries = [];
-        for (const pts of [[s0.p], [e0.p], [s0.p, e0.p]]) for (const R of [2, 3, 6]) tries.push([pts, R]);
-        for (const [pts, R] of tries) {
+        const tryR = async (pts, R) => {
           hazR = R; hazRPts = pts;
           try {
             say('Petits fonds près du départ ou de l\u2019arrivée, nouveau calcul…');
@@ -2762,8 +2762,22 @@
               if (!added || routeClear(r4.legs)) break;
               r4 = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement des petits fonds… ${Math.round(f * 100)} %`); });
             }
-            if (!r4.error) { r = r4; hazCut = true; break; }
+            return r4.error ? null : r4;
           } finally { hazR = 1; hazRPts = null; }
+        };
+        // Essai le plus large d'abord (6 M autour des deux points) : s'il échoue, tous les autres échoueraient aussi.
+        // Sinon : un seul point (départ, puis arrivée), rayon le plus petit qui marche ; les deux points en dernier.
+        const wide = await tryR([s0.p, e0.p], 6);
+        if (wide) {
+          let got = null;
+          for (const pts of [[s0.p], [e0.p]]) {
+            const r6 = await tryR(pts, 6);
+            if (!r6) continue;
+            got = (await tryR(pts, 2)) || (await tryR(pts, 3)) || r6;
+            break;
+          }
+          if (!got) got = (await tryR([s0.p, e0.p], 3)) || wide;
+          r = got; hazCut = true;
         }
       }
       if (fineOn && coastM > 50 && (r.error === 'stuck' || r.error === 'blocked')) {
@@ -3903,7 +3917,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=203`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=204`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
