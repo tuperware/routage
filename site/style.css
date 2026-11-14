@@ -213,6 +213,7 @@ tbody tr:hover { background: #eef4f8; }
 .set-body .small, #o-note { font-size: var(--text-xs); color: var(--muted); margin: 6px 0 0; }
 .lg { display: inline-block; width: 26px; height: 0; vertical-align: middle; margin: 0 6px 0 0; border-top: 4px solid #b8322a; }
 .lg-mot { border-top: 4px dashed #1d2733; }
+.lg-warn { border-top: 5px dashed #f28c00; }
 .lg-item { display: inline-block; margin-right: 18px; white-space: nowrap; }
 .mot { color: #c0261c; font-weight: 700; }
 .set-row.col { display: grid; gap: 10px; justify-content: stretch; }

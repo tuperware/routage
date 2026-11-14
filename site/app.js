@@ -612,6 +612,27 @@
     const px = Math.min(FN - 1, Math.floor((t.x % 1) * FN)), py = Math.min(FN - 1, Math.floor((t.y % 1) * FN));
     return m[py * FN + px] === 1;
   }
+  // Tronçons de la route qui passent sur un petit fond ou un danger non évité (pointillé orange : à vérifier)
+  function hazAt(lat, lon) {
+    const t = fineKey(lat, lon), m = hazMask(t.k);
+    if (!m || m === 'S') return false;
+    const px = Math.min(FN - 1, Math.floor((t.x % 1) * FN)), py = Math.min(FN - 1, Math.floor((t.y % 1) * FN));
+    return m[py * FN + px] === 1;
+  }
+  function warnRuns(r) {
+    if (!hazOn || !r || !r.legs) return [];
+    const out = []; let cur = null, gap = 0;
+    for (let i = 1; i < r.legs.length; i++) {
+      const a = r.legs[i - 1], b = r.legs[i], n = Math.max(1, Math.ceil(distNm(a, b) / 0.02));
+      for (let j = i === 1 ? 0 : 1; j <= n; j++) {
+        const lat = a.lat + (b.lat - a.lat) * j / n, lon = a.lon + (b.lon - a.lon) * j / n;
+        if (hazAt(lat, lon)) { if (!cur) { cur = [[lon, lat]]; out.push(cur); } else cur.push([lon, lat]); gap = 0; }
+        else if (cur) { cur.push([lon, lat]); if (++gap > 5) { cur.splice(cur.length - gap + 1); cur = null; gap = 0; } }
+      }
+    }
+    if (cur && gap) cur.splice(cur.length - gap + 1);
+    return out.filter(c => c.length > 1).map(c => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} }));
+  }
   function hazNear(lat, lon) { if (!hazOn || !fineOn) return false; const m = hazMask(fineKey(lat, lon).k); return !!m && m !== 'S'; }
   function keysAlong(legs) {
     const out = [];
@@ -1978,6 +1999,8 @@
     map.addLayer({ id: 'plan', type: 'line', source: 'plan', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#1f5f8b', 'line-width': 2.5, 'line-opacity': 0.8, 'line-dasharray': [2, 1.5] } });
     map.addLayer({ id: 'route', type: 'line', source: 'route', filter: ['!=', ['get', 'mot'], true], layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#b8322a', 'line-width': 3.5 } });
     map.addLayer({ id: 'route-mot', type: 'line', source: 'route', filter: ['==', ['get', 'mot'], true], layout: { 'line-join': 'round' }, paint: { 'line-color': '#1d2733', 'line-width': 3.5, 'line-dasharray': [1.6, 1.2] } });
+    map.addSource('route-warn', { type: 'geojson', data: EMPTY });
+    map.addLayer({ id: 'route-warn', type: 'line', source: 'route-warn', layout: { 'line-join': 'round' }, paint: { 'line-color': '#f28c00', 'line-width': 5, 'line-dasharray': [1.2, 0.9] } });
     map.addLayer({ id: 'nodes', type: 'circle', source: 'nodes', paint: { 'circle-radius': 3, 'circle-color': '#fff', 'circle-stroke-color': '#b8322a', 'circle-stroke-width': 1.5 } });
     map.addSource('ruler', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'ruler-casing', type: 'line', source: 'ruler', paint: { 'line-color': '#fff', 'line-width': 5 } });
@@ -2638,7 +2661,7 @@
     say('');
     if (boat) { boat.remove(); boat = null; }
     clearCompare();
-    ['route', 'nodes', 'isos', ...(wxOn ? [] : ['wind'])].forEach(id => map.getSource(id) && map.getSource(id).setData(EMPTY));
+    ['route', 'route-warn', 'nodes', 'isos', ...(wxOn ? [] : ['wind'])].forEach(id => map.getSource(id) && map.getSource(id).setData(EMPTY));
     if (!wxOn) {
     if (map.getLayer('waves')) map.setLayoutProperty('waves', 'visibility', 'none');
     map.getSource('wave-dirs') && map.getSource('wave-dirs').setData(EMPTY);
@@ -3258,6 +3281,8 @@
       else runs.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [a, b] }, properties: { mot: m } });
     }
     map.getSource('route').setData({ type: 'FeatureCollection', features: runs });
+    const warn = warnRuns(r);
+    map.getSource('route-warn').setData({ type: 'FeatureCollection', features: warn });
     const wmax = Math.max(...r.legs.filter(n => n.tws != null).map(n => n.tws));
     ui.dur.textContent = fmtDur(r.dur);
     ui.eta.textContent = hfmt.format(timeAt(r.h0 + r.dur));
@@ -3277,8 +3302,9 @@
     for (let i = 0; i < r.legs.length - 1; i++) if (r.legs[i].wait) waitH += r.legs[i + 1].h - r.legs[i].h;
     for (let i = 0; i < r.legs.length - 1; i++) if (r.legs[i].mot) motH += r.legs[i + 1].h - r.legs[i].h;
     const rm = el('r-motor');
-    rm.hidden = !(motH > 0);
+    rm.hidden = !(motH > 0 || warn.length);
     rm.innerHTML = motH > 0 ? `${r.dur - motH > 1 / 60 ? `<span class="lg-item"><span class="lg lg-sail"></span>Voile ${fmtDur(Math.max(0, r.dur - motH))}</span>` : ''}<span class="lg-item"><span class="lg lg-mot"></span>Moteur ${fmtDur(motH)}</span>` : '';
+    if (warn.length) rm.insertAdjacentHTML('beforeend', '<span class="lg-item"><span class="lg lg-warn"></span>Fonds à vérifier</span>');
 
     const rc = el('r-cur');
     if (r.useCur) {
@@ -3877,7 +3903,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=202`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=203`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
