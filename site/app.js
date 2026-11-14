@@ -596,6 +596,7 @@
   let hazDm = null; // seuil de profondeur réduit pour un recours (zones qui découvrent seulement)
   let hazPtsOnly = false; // dernier recours : fonds ignorés partout, dangers balisés gardés
   let hazR = 1; // rayon sans contrôle des fonds autour des points, en milles
+  let hazRPts = null; // points concernés par hazR (null : tous)
   function hazLand(lat, lon) {
     if (!hazOn || !fineOn || chanMode || narrowOk) return false;
     if (chanMode) return false;
@@ -604,7 +605,9 @@
     for (const q of coastNear) { const dy = lat - q.lat, dx = (lon - q.lon) * Math.cos(rad(q.lat)); d2 = Math.min(d2, dy * dy + dx * dx); }
     if (d2 < 1 / 3600) return false;
     // zone élargie (estuaire) : fonds ignorés, dangers balisés toujours évités
-    const t = fineKey(lat, lon), m = hazPtsOnly || d2 < (hazR / 60) * (hazR / 60) ? hazPtsMask(t.k) : hazMask(t.k);
+    let dR = d2;
+    if (hazRPts && hazR > 1) { dR = Infinity; for (const q of hazRPts) { const dy = lat - q.lat, dx = (lon - q.lon) * Math.cos(rad(q.lat)); dR = Math.min(dR, dy * dy + dx * dx); } }
+    const t = fineKey(lat, lon), m = hazPtsOnly || dR < (hazR / 60) * (hazR / 60) ? hazPtsMask(t.k) : hazMask(t.k);
     if (!m || m === 'S') return false;
     const px = Math.min(FN - 1, Math.floor((t.x % 1) * FN)), py = Math.min(FN - 1, Math.floor((t.y % 1) * FN));
     return m[py * FN + px] === 1;
@@ -2721,9 +2724,12 @@
         if (r.error === 'stuck' || r.error === 'blocked') r = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement de la côte… ${Math.round(f * 100)} %`); }, 'wave');
       }
       if (fineOn && hazOn && (r.error === 'stuck' || r.error === 'blocked')) {
-        // Départ ou arrivée dans un estuaire peu profond : fonds ignorés plus loin autour d'eux (3 puis 6 M), le reste du trajet contrôlé
-        for (const R of [3, 6]) {
-          hazR = R;
+        // Départ ou arrivée dans un estuaire peu profond : fonds ignorés plus loin autour du seul point qui bloque
+        // (départ, puis arrivée, puis les deux), avec le plus petit rayon possible (2, 3 puis 6 M) ; le reste du trajet contrôlé
+        const tries = [];
+        for (const pts of [[s0.p], [e0.p], [s0.p, e0.p]]) for (const R of [2, 3, 6]) tries.push([pts, R]);
+        for (const [pts, R] of tries) {
+          hazR = R; hazRPts = pts;
           try {
             say('Petits fonds près du départ ou de l\u2019arrivée, nouveau calcul…');
             let r4 = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement des petits fonds… ${Math.round(f * 100)} %`); });
@@ -2734,7 +2740,7 @@
               r4 = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement des petits fonds… ${Math.round(f * 100)} %`); });
             }
             if (!r4.error) { r = r4; hazCut = true; break; }
-          } finally { hazR = 1; }
+          } finally { hazR = 1; hazRPts = null; }
         }
       }
       if (fineOn && coastM > 50 && (r.error === 'stuck' || r.error === 'blocked')) {
@@ -3871,7 +3877,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=201`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=202`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
