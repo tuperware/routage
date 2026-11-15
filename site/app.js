@@ -2737,8 +2737,7 @@
       //  4. départ ou arrivée au fond d'une rivière : on suit le chenal jusqu'à la mer
       //  5. petits fonds partout : d'abord seulement ce qui découvre (au-delà de 6 M), puis dangers balisés seuls
       //  6. plan d'eau relié par un canal (étang de Berre) : route jusqu'au canal, le canal, puis route
-      //  7. sans les petits fonds ni les dangers (avec avertissement)
-      //  8. masque de côte d'origine, moins précis
+      //  7. masque de côte d'origine, moins précis
       const isBlk = x => x.error === 'stuck' || x.error === 'blocked';
       const prog = lab => (f, isos) => { drawIsos(isos); say(`${lab}… ${Math.round(f * 100)} %`); };
       // calcul secteurs, puis « vague » si bloqué
@@ -2865,15 +2864,8 @@
           } finally { coastNear = keep; fineOn = true; }
         }
       }
-      if (fineOn && hazOn && isBlk(r)) {
-        // 7. petits fonds ou dangers ferment le passage : même calcul sans eux, avec un avertissement
-        say('Petits fonds sur le passage, nouveau calcul sans eux…');
-        hazOn = false;
-        try { const r3 = await leg(start, end, s0, e0, h0, deep); if (!r3.error) { r = r3; if (fineOn) hazCut = true; } } finally { hazOn = true; }
-        return r;
-      }
       if (fineOn && isBlk(r)) {
-        // 8. la côte précise ferme le passage (point dans un bassin, chenal étroit) : calcul avec le masque d'origine
+        // 7. la côte précise ferme le passage (point dans un bassin, chenal étroit) : calcul avec le masque d'origine
         fineOn = false;
         s0 = snapToSea(start) || s0; e0 = snapToSea(end) || e0;
         r = await calc(s0.p, e0.p, h0, 'Contournement de la côte');
@@ -3929,7 +3921,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=205`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=206`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
