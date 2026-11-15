@@ -3010,6 +3010,12 @@
 
   // Arrivée de nuit : encadré retiré (les horaires suffisent)
   function nightNote() { el('r-night').hidden = true; }
+  // petite lune après l'heure d'arrivée si on arrive de nuit (rien de jour)
+  function dayIcon(r) {
+    const E = r.legs[r.legs.length - 1];
+    if (sunUp(E.lat, E.lon, timeAt(r.h0 + r.dur))) return '';
+    return '<svg class="dn-ic moon" viewBox="0 0 16 16" role="img" aria-label="arrivée de nuit"><title>Arrivée de nuit</title><path d="M10.8 1.6A6.6 6.6 0 1 0 14.4 11 5.4 5.4 0 0 1 10.8 1.6z" fill="currentColor"/></svg>';
+  }
 
   // ---------- Ma position (GPS du téléphone) : point bleu, départ, écart à la route ----------
   let gpsId = null, gpsMk = null, gpsFirst = false, gpsPos = null;
@@ -3286,7 +3292,7 @@
     map.getSource('route-warn').setData({ type: 'FeatureCollection', features: warn });
     const wmax = Math.max(...r.legs.filter(n => n.tws != null).map(n => n.tws));
     ui.dur.textContent = fmtDur(r.dur);
-    ui.eta.textContent = hfmt.format(timeAt(r.h0 + r.dur));
+    ui.eta.innerHTML = hfmt.format(timeAt(r.h0 + r.dur)) + (dayIcon(r) ? ' ' + dayIcon(r) : '');
     el('r-dep').textContent = hfmt.format(timeAt(r.h0));
     ui.dist.textContent = distTxt(r.dist);
     ui.wmax.textContent = `${nf0.format(wmax)} nds`;
@@ -3338,7 +3344,7 @@
     ui.result.hidden = false;
     panel.classList.add('has-result'); ui.hint.textContent = 'Route calculée.';
     el('wave-toggle').hidden = !!r.noWaves;
-    el('peek').innerHTML = `${fmtDur(r.dur)} · arrivée ${hfmt.format(timeAt(r.h0 + r.dur))} · ${distTxt(r.dist)}<small>${r.model}${r.noWaves ? '' : ` · vagues max ${el('r-wave').textContent}`}${r.vias ? ` · ${r.vias} point${r.vias > 1 ? 's' : ''} de passage` : ''}${motH > 0 ? ` · moteur ${fmtDur(motH)}` : ''}${waitH > 0 ? ` · attente ${fmtDur(waitH)}` : ''}${r.alt ? `<br>Sans attente : arrivée ${hfmt.format(timeAt(r.alt.h))}, vagues jusqu'à ${nf1.format(r.alt.hs)} m` : ''}</small>`;
+    el('peek').innerHTML = `${fmtDur(r.dur)} · arrivée ${hfmt.format(timeAt(r.h0 + r.dur))}${dayIcon(r) ? ' ' + dayIcon(r) : ''} · ${distTxt(r.dist)}<small>${r.model}${r.noWaves ? '' : ` · vagues max ${el('r-wave').textContent}`}${r.vias ? ` · ${r.vias} point${r.vias > 1 ? 's' : ''} de passage` : ''}${motH > 0 ? ` · moteur ${fmtDur(motH)}` : ''}${waitH > 0 ? ` · attente ${fmtDur(waitH)}` : ''}${r.alt ? `<br>Sans attente : arrivée ${hfmt.format(timeAt(r.alt.h))}, vagues jusqu'à ${nf1.format(r.alt.hs)} m` : ''}</small>`;
     setSheet(false);
     say(`Route ${r.model}${r.noWaves ? '' : `, vagues ${r.wName}`}, pas de ${String(r.dt).replace('.', ',')} h.${r.snapped ? ' Départ ou arrivée déplacé en mer.' : ''}${r.coastCut ? ` Passage trop étroit pour ${r.coastM} m : la route passe plus près de la côte, vérifiez sur la carte.` : ` À ${r.coastM} m des côtes au moins.`}${r.legs.some(x => x.tack) ? ' Passage étroit face au vent : il faut tirer des bords serrés, moteur conseillé.' : ''}${r.hazCut ? ' Attention : la route passe sur un petit fond ou près d\u2019un danger balisé, vérifiez sur la carte.' : r.dmin > 0 ? ` Fonds de moins de ${nf1.format(r.dmin)} m et dangers balisés évités (données approximatives).` : ' Dangers balisés évités.'}`);
     const b = new maplibregl.LngLatBounds(coords[0], coords[0]);
@@ -3422,7 +3428,6 @@
     else if (sv) plus.push('Pas de ris à prendre d\'après votre tableau de voilure.');
     if (wait > 0) moins.push(`Attente de ${fmtDur(wait)} sur place pour laisser passer la mer.`);
     if (night > 1) moins.push(`Navigation de nuit : ${fmtDur(night)}.`);
-    if (!sunUp(end.lat, end.lon, arr)) moins.push(`Arrivée de nuit (${hfmt.format(arr)}).`);
     if (r.h0 + dur - (Date.now() - (r.t0 != null ? r.t0 : wind.t0)) / 3.6e6 > 72) moins.push('Fin de route à plus de 3 jours : prévision moins sûre, à recalculer avant le départ.');
     if (r.alt) moins.push(`Sans attente, arrivée ${hfmt.format(timeAt(r.alt.h))} mais vagues jusqu'à ${nf1.format(r.alt.hs)} m.`);
 
@@ -3904,7 +3909,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=207`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=208`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
