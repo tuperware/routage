@@ -3909,7 +3909,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=208`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=209`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
@@ -3954,7 +3954,7 @@
     f.classList.toggle('folded', shut);
     const b = el('fab-fold'); b.setAttribute('aria-expanded', shut ? 'false' : 'true');
     b.setAttribute('aria-label', shut ? 'Afficher les boutons' : 'Cacher les boutons');
-    b.querySelector('span').textContent = shut ? 'Outils' : 'Cacher';
+    b.querySelector('span').textContent = 'Cacher';
   });
   el('reset').addEventListener('click', () => {
     el('gpx-help').hidden = true;

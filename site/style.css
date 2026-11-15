@@ -712,3 +712,11 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
 /* petite lune après l'heure d'arrivée */
 .dn-ic { width: 1.05em; height: 1.05em; vertical-align: -0.15em; display: inline-block; }
 .dn-ic.moon { color: #3b4a8c; }
+/* Bandeau replié : petite languette discrète collée au bord droit */
+@media (max-width: 720px) {
+  .wave-fab.folded { right: 0; border-radius: 12px 0 0 12px; background: rgba(255,255,255,.78); box-shadow: 0 1px 4px rgba(22,36,58,.18); overflow: visible; }
+  .wave-fab.folded .fab-fold { width: 26px; min-height: 60px; padding: 0; position: relative; }
+  .wave-fab.folded .fab-fold span { display: none; }
+  .wave-fab.folded .fab-fold svg { width: 18px; height: 18px; color: #6b7686; }
+  .wave-fab.folded .fab-fold::before { content: ""; position: absolute; inset: -8px 0 -8px -14px; } /* zone de toucher plus large */
+}
