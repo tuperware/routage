@@ -2029,7 +2029,7 @@
         const L = JSON.parse(JSON.stringify(l).replace(/Noto Sans SemiBold/g, 'Noto Sans Bold'));
         L.id = 'sea-' + l.id;
         if (l.id === 'depth-areas') L.paint = Object.assign({}, L.paint, { 'fill-opacity': 0.55 });
-        L.layout = Object.assign({}, L.layout, { visibility: chartOn && chartSrc === 'sea' ? 'visible' : 'none' });
+        L.layout = Object.assign({}, L.layout, { visibility: chartOn ? 'visible' : 'none' });
         try { map.addLayer(L, L.type === 'symbol' ? 'shom' : firstSym); seaIds.push(L.id); } catch (e) { console.warn('seamap', l.id, e.message); }
       }
     } catch (e) { console.warn('seamap', e); seaIds = null; }
@@ -2486,54 +2486,30 @@
   el('ruler-close').addEventListener('click', () => rulerSet(false));
   // Bouton Carte marine : mémorisé dans un cookie
   // Choix de la carte (Balises ou SHOM) mémorisé dans un cookie ; la carte reste éteinte à l'ouverture
-  let chartSrc = 'sea'; // Seamap seul, fondu avec le relief
-  // Choix automatique selon le centre de l'écran : SHOM en France, IHM en Espagne, Balises ailleurs
-  const inB = (la, lo, a, b, c, d) => la >= a && la <= b && lo >= c && lo <= d;
-  function autoSrc() {
-    const c = map.getCenter(), la = c.lat, lo = c.lng, z = map.getZoom();
-    if (z < 6) return 'osm';
-    const es = inB(la, lo, 35.95, 42.43, -5.65, 4.6) || inB(la, lo, 41.85, 43.9, -9.9, -1.78) || inB(la, lo, 36, 37.4, -7.4, -5.65) || inB(la, lo, 27.4, 29.6, -18.4, -13.2);
-    if (es) return 'ihm';
-    if (inB(la, lo, 24, 49.5, -125, -66.5) || inB(la, lo, 51, 72, -180, -129) || inB(la, lo, 18.5, 23, -161, -154) || inB(la, lo, 17.5, 18.8, -68, -64.3) || inB(la, lo, 13, 15.5, 144.5, 146)) return 'noaa';
-    if (inB(la, lo, 62.8, 67.6, -25.5, -12.5)) return 'isl';
-    if (inB(la, lo, -34, 5.5, -54, -28) && !(la < -30 && lo < -53)) return 'bra';
-    if (inB(la, lo, 57.8, 72, 4, 31.5) && !(la < 59.2 && lo > 11.4) && !(lo > 12.5 + (la - 59.2) * 0.6 && la < 68.5)) return 'nor';
-    if ((inB(la, lo, 59.6, 61, 19.3, 30.5) && !(la < 59.75 && lo > 22.5)) || inB(la, lo, 61, 66, 21, 25.7)) return 'fin';
-    if ((inB(la, lo, 55.2, 59.2, 12.4, 19.5) && !inB(la, lo, 54.9, 55.4, 14.5, 15.3) && !(la < 56.2 && lo < 12.8)) || inB(la, lo, 56.2, 59.2, 11.1, 12.4) || (inB(la, lo, 59.2, 66, 12.5, 21) && lo > 12.5 + (la - 59.2) * 0.6 && !(la < 61 && lo > 19.3))) return 'swe';
-    const fr = (inB(la, lo, 41.3, 51.2, -5.8, 9.7) && !(lo > 7.53 && la > 43.2 && la < 46) && !(la > 50.2 && lo < 1.4) && !(la > 50.95 && lo > 2.6))
-      || inB(la, lo, 14, 18.2, -63.3, -60.7) || inB(la, lo, 1.9, 6.1, -54.8, -51.4) || inB(la, lo, -21.5, -20.7, 55.1, 55.95) || inB(la, lo, -13.1, -12.5, 44.9, 45.4) || inB(la, lo, 46.6, 47.2, -56.6, -55.9);
-    return fr ? 'shom' : 'osm';
-  }
-  let chartEff = 'osm';
+  // Deux cartes : Seamap (d'office) ou carte littorale SHOM-IGN (France) posée sur Seamap ; choix gardé dans un cookie
+  let chartSrc = /(?:^|; )tiki_chartsrc=shom(?:;|$)/.test(document.cookie) ? 'shom' : 'sea';
   // Téléphone : nom de la carte et avertissement visibles 5 s, puis repliés ; on les revoit en touchant le cadre
   let chartTxt0 = '', chartTxtT = 0;
   function chartTxtShow() { const lg = el('chart-legend'); lg.classList.remove('quiet'); clearTimeout(chartTxtT); chartTxtT = setTimeout(() => lg.classList.add('quiet'), 5000); }
-  el('chart-legend').addEventListener('click', e => { if (e.target.closest('button, select')) return; const lg = el('chart-legend'); if (lg.classList.contains('quiet')) chartTxtShow(); else { clearTimeout(chartTxtT); lg.classList.add('quiet'); } });
+  el('chart-legend').addEventListener('click', e => { if (e.target.closest('button')) return; const lg = el('chart-legend'); if (lg.classList.contains('quiet')) chartTxtShow(); else { clearTimeout(chartTxtT); lg.classList.add('quiet'); } });
   function chartSet(on) {
     chartOn = on;
-    const chartSrc0 = chartSrc; { const chartSrc = chartSrc0 === 'auto' ? autoSrc() : chartSrc0; chartEff = chartSrc;
     el('chart-btn').setAttribute('aria-pressed', on ? 'true' : 'false');
-    el('chart-legend').hidden = true;
+    el('chart-legend').hidden = !on;
     const vis = (id, v) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none');
-    vis('shom', on && chartSrc === 'shom'); ['ihm', 'noaa', 'bra', 'nor', 'fin', 'isl', 'swe'].forEach(id => vis(id, on && chartSrc === id));
-    vis('emod', on && chartSrc === 'osm'); vis('seamark', on && chartSrc === 'osm');
-    if (on && chartSrc === 'sea' && !seaIds) addSeamap();
-    (seaIds || []).forEach(id => vis(id, on && chartSrc === 'sea'));
-    vis('relief-shade', !(on && chartSrc === 'sea')); // Seamap a déjà son propre relief des fonds
-    el('chart-auto').setAttribute('aria-pressed', chartSrc0 === 'auto' ? 'true' : 'false');
-    const pr = v => chartSrc0 !== 'auto' && chartSrc === v ? 'true' : 'false';
-    el('chart-pick').value = chartSrc0 === 'auto' ? '' : chartSrc;
-    el('chart-pick').setAttribute('aria-pressed', chartSrc0 === 'auto' ? 'false' : 'true');
-    el('chart-title').textContent = (chartSrc0 === 'auto' ? 'Auto · ' : '') + { ihm: 'Carte marine IHM, côtes d\u2019Espagne', noaa: 'Carte marine NOAA, États-Unis', bra: 'Carta náutica DHN, Brésil', nor: 'Sjøkart Kartverket, Norvège', fin: 'Merikartta Traficom, Finlande', isl: 'Sjókort LHG, Islande', swe: 'Sjökort Sjöfartsverket, Suède', shom: 'Carte littorale SHOM-IGN (Géoportail), côtes de France', sea: 'Fonds, balises et feux (Seamap)', osm: 'Balises et feux OpenSeaMap, sondes EMODnet (50 m et plus)' }[chartSrc];
-    el('chart-warn').textContent = chartSrc === 'ihm' ? 'Selon l\u2019IHM : non valable pour la navigation' : ['noaa', 'bra', 'nor', 'fin', 'isl', 'swe'].includes(chartSrc) ? 'Carte officielle gratuite : non valable pour la navigation' : chartSrc === 'shom' ? 'Mise à jour non garantie : ne pas utiliser pour naviguer' : 'Non officielle : ne remplace pas les cartes du SHOM';
+    vis('shom', on && chartSrc === 'shom');
+    if (on && !seaIds) addSeamap();
+    (seaIds || []).forEach(id => vis(id, on)); // Seamap reste dessous : il couvre ce que la carte SHOM n'a pas
+    vis('relief-shade', !on); // Seamap a déjà son propre relief des fonds
+    el('chart-sea').setAttribute('aria-pressed', chartSrc === 'sea' ? 'true' : 'false');
+    el('chart-shom').setAttribute('aria-pressed', chartSrc === 'shom' ? 'true' : 'false');
+    el('chart-title').textContent = chartSrc === 'shom' ? 'Carte littorale SHOM-IGN (France seulement)' : 'Seamap : fonds, balises et feux';
+    el('chart-warn').textContent = 'Ne remplace pas les cartes marines officielles';
     const tt = on ? el('chart-title').textContent : ''; if (tt && tt !== chartTxt0) chartTxtShow(); chartTxt0 = tt;
-    }
-    try { document.cookie = 'tiki_chart=0; Max-Age=0; Path=/; Secure; SameSite=Lax'; } catch (e) {}
   }
   const chartPick = v => { chartSrc = v; try { document.cookie = `tiki_chartsrc=${v}; Max-Age=31536000; Path=/; Secure; SameSite=Lax`; } catch (e) {} chartSet(true); };
-  el('chart-auto').addEventListener('click', () => chartPick('auto'));
-  el('chart-pick').addEventListener('change', e => { if (e.target.value) chartPick(e.target.value); });
-  map.on('moveend', () => { if (chartOn && chartSrc === 'auto' && autoSrc() !== chartEff) chartSet(true); });
+  el('chart-sea').addEventListener('click', () => chartPick('sea'));
+  el('chart-shom').addEventListener('click', () => chartPick('shom'));
   el('chart-btn').addEventListener('click', () => chartSet(!chartOn));
   if (chartOn) chartSet(true);
   el('wx-btn').addEventListener('click', () => (wxOn ? wxClose() : wxOpen()));
@@ -3909,7 +3885,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=209`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=210`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
