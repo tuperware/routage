@@ -2730,38 +2730,52 @@
       drawWind(h0);
 
       // Un tronçon : du point A au point B, en partant à l'heure h0
+      // Recours quand la route est bloquée, essayés dans cet ordre (on s'arrête au premier qui marche) :
+      //  1. calcul normal (secteurs), puis « vague » qui contourne mieux les côtes ; contrôle avec la côte précise
+      //  2. petits fonds autour du départ ou de l'arrivée (estuaire) : fonds ignorés autour d'un seul point si possible
+      //  3. passage étroit : distance à la côte réduite à 50 m
+      //  4. départ ou arrivée au fond d'une rivière : on suit le chenal jusqu'à la mer
+      //  5. petits fonds partout : d'abord seulement ce qui découvre (au-delà de 6 M), puis dangers balisés seuls
+      //  6. plan d'eau relié par un canal (étang de Berre) : route jusqu'au canal, le canal, puis route
+      //  7. sans les petits fonds ni les dangers (avec avertissement)
+      //  8. masque de côte d'origine, moins précis
+      const isBlk = x => x.error === 'stuck' || x.error === 'blocked';
+      const prog = lab => (f, isos) => { drawIsos(isos); say(`${lab}… ${Math.round(f * 100)} %`); };
+      // calcul secteurs, puis « vague » si bloqué
+      const calc = async (a, b, h, lab, lab2 = 'Contournement de la côte') => {
+        let x = await route(a, b, h, prog(lab));
+        if (isBlk(x)) x = await route(a, b, h, prog(lab2), 'wave');
+        return x;
+      };
+      // côte précise (et petits fonds) chargée le long de la route trouvée ; recalcul si elle touche (3 fois au plus)
+      const refine = async (x, a, b, h, lab, opts) => {
+        for (let it = 0; it < 3 && (!opts.fine || fineOn) && !x.error; it++) {
+          const added = await loadFineKeys(fineKeysAlong(x.legs)) + (opts.haz ? await loadHazKeys(keysAlong(x.legs)) : 0);
+          if (!added || routeClear(x.legs)) break;
+          if (opts.msg) say(opts.msg);
+          x = opts.wave ? await calc(a, b, h, lab) : await route(a, b, h, prog(lab));
+        }
+        return x;
+      };
       const leg = async (start, end, s0, e0, h0, deep = 0) => {
       let portKeys0 = null;
       fineOn = true; coastM = OPT.coast;
+      // 1. calcul normal
       say('Calcul de la route…');
-      let r = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Calcul de la route… ${Math.round(f * 100)} %`); });
-      if (r.error === 'stuck' || r.error === 'blocked') {
+      let r = await route(s0.p, e0.p, h0, prog('Calcul de la route'));
+      if (isBlk(r)) {
         say('Côte sur le passage, recherche d\u2019un contournement…');
-        r = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement de la côte… ${Math.round(f * 100)} %`); }, 'wave');
+        r = await route(s0.p, e0.p, h0, prog('Contournement de la côte'), 'wave');
       }
-      // Contrôle avec la côte précise le long de la route trouvée ; si elle touche une digue,
-      // une flèche ou un îlot que le masque grossier ignorait, on recalcule (3 fois au plus).
-      for (let it = 0; it < 3 && fineOn && !r.error; it++) {
-        const added = await loadFineKeys(fineKeysAlong(r.legs)) + (hazOn ? await loadHazKeys(keysAlong(r.legs)) : 0);
-        if (!added || routeClear(r.legs)) break;
-        say('Côte précise sur le passage, nouveau calcul…');
-        r = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement de la côte… ${Math.round(f * 100)} %`); });
-        if (r.error === 'stuck' || r.error === 'blocked') r = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement de la côte… ${Math.round(f * 100)} %`); }, 'wave');
-      }
-      if (fineOn && hazOn && (r.error === 'stuck' || r.error === 'blocked')) {
-        // Départ ou arrivée dans un estuaire peu profond : fonds ignorés plus loin autour du seul point qui bloque
-        // (départ, puis arrivée, puis les deux), avec le plus petit rayon possible (2, 3 puis 6 M) ; le reste du trajet contrôlé
+      r = await refine(r, s0.p, e0.p, h0, 'Contournement de la côte', { fine: true, haz: hazOn, wave: true, msg: 'Côte précise sur le passage, nouveau calcul…' });
+      if (fineOn && hazOn && isBlk(r)) {
+        // 2. estuaire peu profond : fonds ignorés autour du seul point qui bloque, avec le plus petit rayon possible
         const tryR = async (pts, R) => {
           hazR = R; hazRPts = pts;
           try {
             say('Petits fonds près du départ ou de l\u2019arrivée, nouveau calcul…');
-            let r4 = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement des petits fonds… ${Math.round(f * 100)} %`); });
-            if (r4.error === 'stuck' || r4.error === 'blocked') r4 = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement des petits fonds… ${Math.round(f * 100)} %`); }, 'wave');
-            for (let it = 0; it < 3 && !r4.error; it++) {
-              const added = await loadFineKeys(fineKeysAlong(r4.legs)) + await loadHazKeys(keysAlong(r4.legs));
-              if (!added || routeClear(r4.legs)) break;
-              r4 = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement des petits fonds… ${Math.round(f * 100)} %`); });
-            }
+            let r4 = await calc(s0.p, e0.p, h0, 'Contournement des petits fonds', 'Contournement des petits fonds');
+            r4 = await refine(r4, s0.p, e0.p, h0, 'Contournement des petits fonds', { haz: true });
             return r4.error ? null : r4;
           } finally { hazR = 1; hazRPts = null; }
         };
@@ -2780,15 +2794,14 @@
           r = got; hazCut = true;
         }
       }
-      if (fineOn && coastM > 50 && (r.error === 'stuck' || r.error === 'blocked')) {
-        // Passage trop étroit pour la distance à la côte choisie : on retente à 50 m
+      if (fineOn && coastM > 50 && isBlk(r)) {
+        // 3. passage trop étroit pour la distance à la côte choisie : on retente à 50 m
         coastM = 50; coastCut = true;
         say('Passage étroit : distance à la côte réduite à 50 m…');
-        r = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement de la côte… ${Math.round(f * 100)} %`); });
-        if (r.error === 'stuck' || r.error === 'blocked') r = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement de la côte… ${Math.round(f * 100)} %`); }, 'wave');
+        r = await calc(s0.p, e0.p, h0, 'Contournement de la côte');
       }
-      if (fineOn && (r.error === 'stuck' || r.error === 'blocked')) {
-        // Départ ou arrivée au fond d'une rivière ou d'une ria : on suit le chenal jusqu'à la mer ouverte
+      if (fineOn && isBlk(r)) {
+        // 4. départ ou arrivée au fond d'une rivière ou d'une ria : on suit le chenal jusqu'à la mer ouverte
         say('Chenal étroit : recherche du passage jusqu\u2019à la mer…');
         portKeys0 = new Set(port.keys());
         await loadPorts([start, end], 4.5);
@@ -2797,8 +2810,8 @@
           const A = cs ? chanLegs(cs, h0) : null;
           const a = cs ? cs[cs.length - 1] : s0.p, b = ce ? ce[ce.length - 1] : e0.p;
           const hA = A ? A.h : h0;
-          let r2 = A || !cs ? await route(a, b, hA, (f, isos) => { drawIsos(isos); say(`Calcul de la route… ${Math.round(f * 100)} %`); }) : { error: 'blocked' };
-          if (r2.error === 'stuck' || r2.error === 'blocked') r2 = await route(a, b, hA, (f, isos) => { drawIsos(isos); say(`Contournement de la côte… ${Math.round(f * 100)} %`); }, 'wave');
+          let r2 = A || !cs ? await route(a, b, hA, prog('Calcul de la route')) : { error: 'blocked' };
+          if (isBlk(r2)) r2 = await route(a, b, hA, prog('Contournement de la côte'), 'wave');
           if (!r2.error) {
             const L2 = r2.legs;
             const B = ce ? chanLegs([...ce].reverse(), L2[L2.length - 1].h) : null;
@@ -2810,19 +2823,19 @@
           }
         }
       }
-      if (fineOn && hazOn && !hazPtsOnly && hazDm == null && (r.error === 'stuck' || r.error === 'blocked')) {
-        // Petits fonds partout sur le passage : fonds ignorés, dangers balisés toujours évités (avant le passage étroit, qui ne contrôle rien)
+      if (fineOn && hazOn && !hazPtsOnly && hazDm == null && isBlk(r)) {
+        // 5. petits fonds partout sur le passage (avant le canal, qui ne contrôle rien)
         say('Petits fonds sur le passage, nouveau calcul…');
         // d'abord : seulement les zones qui découvrent, au-delà de 6 M des points
         hazDm = 0.3; hazR = 6;
         try { const r6 = await leg(start, end, s0, e0, h0, deep); if (!r6.error) { r = r6; hazCut = true; } } finally { hazDm = null; hazR = 1; }
-        if (r.error === 'stuck' || r.error === 'blocked') {
+        if (isBlk(r)) { // puis : fonds ignorés, dangers balisés toujours évités
           hazPtsOnly = true;
           try { const r5 = await leg(start, end, s0, e0, h0, deep); if (!r5.error) { r = r5; hazCut = true; } } finally { hazPtsOnly = false; }
         }
       }
-      if (deep < 2 && fineOn && (r.error === 'stuck' || r.error === 'blocked')) {
-        // Plan d'eau relié par un passage étroit (étang de Berre par le canal de Caronte…) :
+      if (deep < 2 && fineOn && isBlk(r)) {
+        // 6. plan d'eau relié par un passage étroit (étang de Berre par le canal de Caronte…) :
         // route normale jusqu'à l'entrée du passage, le passage au plus court, puis route normale.
         say('Passage étroit : recherche du canal…');
         if (portKeys0) for (const k of [...port.keys()]) if (!portKeys0.has(k)) port.delete(k); // détail des ports sur 4,5 M : seulement le long du canal
@@ -2852,19 +2865,18 @@
           } finally { coastNear = keep; fineOn = true; }
         }
       }
-      if (fineOn && hazOn && (r.error === 'stuck' || r.error === 'blocked')) {
-        // Petits fonds ou dangers ferment le passage : même calcul sans eux, avec un avertissement
+      if (fineOn && hazOn && isBlk(r)) {
+        // 7. petits fonds ou dangers ferment le passage : même calcul sans eux, avec un avertissement
         say('Petits fonds sur le passage, nouveau calcul sans eux…');
         hazOn = false;
         try { const r3 = await leg(start, end, s0, e0, h0, deep); if (!r3.error) { r = r3; if (fineOn) hazCut = true; } } finally { hazOn = true; }
         return r;
       }
-      if (fineOn && (r.error === 'stuck' || r.error === 'blocked')) {
-        // La côte précise ferme le passage (point dans un bassin, chenal étroit) : calcul avec le masque d'origine
+      if (fineOn && isBlk(r)) {
+        // 8. la côte précise ferme le passage (point dans un bassin, chenal étroit) : calcul avec le masque d'origine
         fineOn = false;
         s0 = snapToSea(start) || s0; e0 = snapToSea(end) || e0;
-        r = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement de la côte… ${Math.round(f * 100)} %`); });
-        if (r.error === 'stuck' || r.error === 'blocked') r = await route(s0.p, e0.p, h0, (f, isos) => { drawIsos(isos); say(`Contournement de la côte… ${Math.round(f * 100)} %`); }, 'wave');
+        r = await calc(s0.p, e0.p, h0, 'Contournement de la côte');
       }
       return r;
       };
@@ -3917,7 +3929,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=204`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=205`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
