@@ -3008,25 +3008,8 @@
   }
   el('best-go').addEventListener('click', runBest);
 
-  // ---------- Arrivée de nuit : on le dit et on propose un départ pour arriver de jour ----------
-  function nightNote(r) {
-    const box = el('r-night'), E = r.legs[r.legs.length - 1], arr = +timeAt(r.h0 + r.dur), dep = +timeAt(r.h0);
-    if (sunUp(E.lat, E.lon, new Date(arr))) { box.hidden = true; return; }
-    const st = 10 * 60e3; let tSet = arr, tRise = arr;
-    for (let k = 0; k < 120 && !sunUp(E.lat, E.lon, new Date(tSet - st)); k++) tSet -= st;
-    for (let k = 0; k < 120 && !sunUp(E.lat, E.lon, new Date(tRise)); k++) tRise += st;
-    const n0 = new Date(); n0.setMinutes(0, 0, 0); n0.setHours(n0.getHours() + 1);
-    const hr = t => { const d = new Date(t); d.setMinutes(0, 0, 0); return d; };
-    const early = hr(dep - (arr - tSet) - 60 * 60e3), late = hr(dep + (tRise - arr) + 90 * 60e3);
-    const bt = [];
-    if (+early >= +n0) bt.push(`<button type="button" class="night-btn" data-t="${+early}">Partir plus tôt : ${dfmt.format(early)}</button>`);
-    bt.push(`<button type="button" class="night-btn" data-t="${+late}">Partir plus tard : ${dfmt.format(late)}</button>`);
-    box.innerHTML = `<b>Arrivée de nuit</b> (${hfmt.format(new Date(arr))}, coucher du soleil ${hfmt.format(new Date(tSet))}, lever ${hfmt.format(new Date(tRise))}). Pour arriver de jour :<span class="night-bts">${bt.join('')}</span>`;
-    box.hidden = false;
-    box.querySelectorAll('.night-btn').forEach(b => b.addEventListener('click', () => {
-      ui.tStart.value = localInput(new Date(+b.dataset.t)); tStartSet = true; runMain();
-    }));
-  }
+  // Arrivée de nuit : encadré retiré (les horaires suffisent)
+  function nightNote() { el('r-night').hidden = true; }
 
   // ---------- Ma position (GPS du téléphone) : point bleu, départ, écart à la route ----------
   let gpsId = null, gpsMk = null, gpsFirst = false, gpsPos = null;
@@ -3921,7 +3904,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=206`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=207`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
