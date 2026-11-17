@@ -1,0 +1,186 @@
+[
+{
+"k": "beneteau_oceanis_38_1",
+"n": "Beneteau Oceanis 38.1",
+"nb": 10,
+"ref": "03190004I0P",
+"yacht": "SOLE VERDE",
+"cls": "Oceanis 38.1"
+},
+{
+"k": "beneteau_oceanis_40_1",
+"n": "Beneteau Oceanis 40.1",
+"nb": 6,
+"ref": "043900051SQ",
+"yacht": "Bluefish 2",
+"cls": "OCEANIS 40.1"
+},
+{
+"k": "beneteau_oceanis_43",
+"n": "Beneteau Oceanis 43",
+"nb": 12,
+"ref": "03190004LSV",
+"yacht": "SELENE II",
+"cls": "Oceanis 43"
+},
+{
+"k": "beneteau_oceanis_46_1",
+"n": "Beneteau Oceanis 46.1",
+"nb": 8,
+"ref": "03420004SUJ",
+"yacht": "UTOPIA",
+"cls": "Oceanis 46.1"
+},
+{
+"k": "beneteau_first_40_7",
+"n": "Beneteau First 40.7",
+"nb": 135,
+"ref": "03440004MQ6",
+"yacht": "Pluto",
+"cls": "FIRST 40.7"
+},
+{
+"k": "jeanneau_sun_odyssey_349",
+"n": "Jeanneau Sun Odyssey 349",
+"nb": 7,
+"ref": "031900050R7",
+"yacht": "PENELOPE",
+"cls": "Sun Odyssey 349"
+},
+{
+"k": "jeanneau_sun_odyssey_410",
+"n": "Jeanneau Sun Odyssey 410",
+"nb": 13,
+"ref": "03620004LWA",
+"yacht": "Beauty",
+"cls": "Sun Odyssey 410"
+},
+{
+"k": "jeanneau_sun_odyssey_440",
+"n": "Jeanneau Sun Odyssey 440",
+"nb": 5,
+"ref": "03190004QU0",
+"yacht": "FREEDOM",
+"cls": "Sun Odyssey 440"
+},
+{
+"k": "jeanneau_sun_fast_3200",
+"n": "Jeanneau Sun Fast 3200",
+"nb": 38,
+"ref": "04150004RFN",
+"yacht": "WAVERIDER",
+"cls": "SUN FAST 3200"
+},
+{
+"k": "dufour_390",
+"n": "Dufour 390 Grand Large",
+"nb": 4,
+"ref": "04410004OSJ",
+"yacht": "HEDAA",
+"cls": "Dufour 390"
+},
+{
+"k": "dufour_412",
+"n": "Dufour 412 Grand Large",
+"nb": 4,
+"ref": "03510004BT8",
+"yacht": "ETREUS II",
+"cls": "DUFOUR 412"
+},
+{
+"k": "dufour_430",
+"n": "Dufour 430 Grand Large",
+"nb": 2,
+"ref": "04590004WOS",
+"yacht": "ESPERANZA",
+"cls": "Dufour 430 GL"
+},
+{
+"k": "hanse_388",
+"n": "Hanse 388",
+"nb": 3,
+"ref": "04330004RMK",
+"yacht": "MISTY",
+"cls": "HANSE 388 GTE"
+},
+{
+"k": "hanse_418",
+"n": "Hanse 418",
+"nb": 3,
+"ref": "03510004ETU",
+"yacht": "APOC APOC",
+"cls": "HANSE 418"
+},
+{
+"k": "dehler_38",
+"n": "Dehler 38",
+"nb": 49,
+"ref": "04310004K1U",
+"yacht": "Ingnis",
+"cls": "Dehler 38"
+},
+{
+"k": "elan_impression_40",
+"n": "Elan Impression 40",
+"nb": 3,
+"ref": "03440004RVH",
+"yacht": "Solabb",
+"cls": "Elan impression 40"
+},
+{
+"k": "bavaria_cruiser_46",
+"n": "Bavaria Cruiser 46",
+"nb": 44,
+"ref": "03620004LUK",
+"yacht": "Rubin",
+"cls": "Bavaria CR 46"
+},
+{
+"k": "bavaria_cruiser_41s",
+"n": "Bavaria Cruiser 41S",
+"nb": 9,
+"ref": "03620004BN2",
+"yacht": "Black Star",
+"cls": "Bavaria CR 41S"
+},
+{
+"k": "bavaria_40_cruiser",
+"n": "Bavaria 40 Cruiser",
+"nb": 8,
+"ref": "03190004B23",
+"yacht": "CINCIN",
+"cls": "Bavaria 40 Cruiser"
+},
+{
+"k": "bavaria_37_cruiser",
+"n": "Bavaria 37 Cruiser",
+"nb": 11,
+"ref": "03440004SK8",
+"yacht": "Cymbal",
+"cls": "Bavaria 37 Cruiser"
+},
+{
+"k": "bavaria_35_match",
+"n": "Bavaria 35 Match",
+"nb": 31,
+"ref": "03440004UBH",
+"yacht": "HELTOK",
+"cls": "Bavaria 35 Match"
+},
+{
+"k": "bavaria_38_match",
+"n": "Bavaria 38 Match",
+"nb": 17,
+"ref": "03190004PDE",
+"yacht": "ANTARTIX",
+"cls": "Bavaria 38 Match"
+},
+{
+"k": "bavaria_42_match",
+"n": "Bavaria 42 Match",
+"nb": 12,
+"ref": "0459000485C",
+"yacht": "NORA",
+"cls": "BAVARIA 42 MATCH"
+}
+]

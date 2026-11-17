@@ -3855,6 +3855,25 @@
       if (last && last.legs) say('Polaire changée : touchez « Relancer » pour mettre la route à jour.');
     } catch (x) { msg.textContent = `Polaire non chargée : ${x.message}`; msg.classList.add('err'); }
   });
+  // Bateaux courants : polaires tirées des certificats ORC (vitesses de course, d'où 85 % par défaut)
+  el('o-orc').addEventListener('change', async e => {
+    const k = e.target.value, opt = e.target.selectedOptions[0]; if (!k) return;
+    el('o-x-pick').hidden = true;
+    const msg = el('o-x-msg');
+    try {
+      const r = await fetch(`polaires/orc/${k}.pol`); if (!r.ok) throw new Error('fichier introuvable');
+      const p = parsePolarText(await r.text());
+      POLARS.x = p; PX_NAME = opt.textContent;
+      savePx(PX_NAME, p);
+      el('o-pol').value = 85;
+      msg.textContent = `${PX_NAME} : polaire ORC (course), réglée à 85 % pour la croisière. Pas de données au-delà de ${nf0.format(p.tws[p.tws.length - 1])} nds.`;
+      msg.classList.remove('err');
+      el('o-pk').dataset.v = 'x'; polKey = ''; saveOpt();
+      { const ib = el('o-ico').querySelector('button[data-v="m"]'); if (ib && OPT.ico !== 'm') ib.click(); }
+      if (last && last.legs) say('Polaire changée : touchez « Relancer » pour mettre la route à jour.');
+    } catch (x) { msg.textContent = `Polaire non chargée : ${x.message}`; msg.classList.add('err'); }
+    e.target.value = '';
+  });
   el('o-file').addEventListener('change', async () => {
     const f = el('o-file').files[0]; el('o-file').value = '';
     if (!f) return;
@@ -3885,7 +3904,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=211`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=212`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
