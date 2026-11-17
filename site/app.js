@@ -3741,7 +3741,7 @@
     document.body.classList.toggle('other-boat', other);
     el('o-pk-txt').textContent = OPT.pk === 'l' ? 'Léger : pas de données au-delà de 30 nds.' : other ? 'Toucher Chargé ou Léger revient au Tiki 38 et retire cette polaire.' : '';
     el('o-x-btn').textContent = PX_NAME;
-    el('o-x-change').textContent = other ? 'Importer une autre polaire' : '+ Importer la polaire d\u2019un autre bateau';
+    el('o-x-change').textContent = other ? 'Changer de bateau' : '+ Autre bateau';
     el('pk-now').textContent = OPT.pk === 'x' ? PX_NAME : `Tiki 38 – ${OPT.pk === 'l' ? 'Léger' : 'Chargé'}`;
     document.body.classList.toggle('has-px', !!POLARS.x);
     { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
@@ -3858,6 +3858,7 @@
   // Bateaux courants : polaires tirées des certificats ORC (vitesses de course, d'où 85 % par défaut)
   el('o-orc').addEventListener('change', async e => {
     const k = e.target.value, opt = e.target.selectedOptions[0]; if (!k) return;
+    if (k === '_mono' || k === '_so42') { e.target.value = ''; el(k === '_mono' ? 'o-mono' : 'o-so42').click(); return; }
     el('o-x-pick').hidden = true;
     const msg = el('o-x-msg');
     try {
@@ -3904,7 +3905,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=212`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=213`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
