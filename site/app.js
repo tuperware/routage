@@ -1921,8 +1921,33 @@
     map.addSource('emod', { type: 'raster', tileSize: 256, tiles: ['https://ows.emodnet-bathymetry.eu/wms?service=WMS&request=GetMap&version=1.1.1&layers=emodnet:contours&format=image/png&transparent=true&srs=EPSG:3857&width=256&height=256&bbox={bbox-epsg-3857}&SLD_BODY=' + EMOD_SLD], attribution: 'Sondes <a href="https://emodnet.ec.europa.eu/en/bathymetry" target="_blank">EMODnet</a>' });
     map.addSource('seamark', { type: 'raster', tileSize: 256, minzoom: 6, maxzoom: 18, tiles: ['https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png'], attribution: 'Balises <a href="https://www.openseamap.org" target="_blank">OpenSeaMap</a>' });
     // Carte littorale SHOM-IGN du Géoportail (flux public de l'IGN), France seulement
+    // On ne garde de la carte littorale que la mer : la partie terre (plan IGN, rues) est effacée
+    // à l'aide des surfaces « mer » d'OpenStreetMap (tuiles OpenFreeMap), avec un petit débord sur la côte.
+    if (!window.__shomSea) { window.__shomSea = 1; maplibregl.addProtocol('shomsea', async (pr, ac) => {
+      const [z, x, y] = pr.url.slice(10).split('/').map(Number);
+      const src = `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.COASTALMAPS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}&FORMAT=image/png`;
+      if (!fineUrl) fineUrl = (await (await fetch('https://tiles.openfreemap.org/planet')).json()).tiles[0];
+      const vz = Math.min(z, 14), f = 1 << (z - vz), vx = Math.floor(x / f), vy = Math.floor(y / f);
+      const [ri, rv] = await Promise.all([fetch(src, { signal: ac.signal }), fetch(fineUrl.replace('{z}', vz).replace('{x}', vx).replace('{y}', vy), { signal: ac.signal })]);
+      if (!ri.ok) throw new Error('tuile SHOM');
+      const img = await createImageBitmap(await ri.blob());
+      const feats = rv.ok ? mvtWater(await rv.arrayBuffer()) : [];
+      const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+      const g = c.getContext('2d');
+      g.fillStyle = '#000'; g.strokeStyle = '#000'; g.lineWidth = 4; g.lineJoin = 'round';
+      for (const ft of feats) {
+        if (ft.kind !== 'sea') continue;
+        const s = S * f / ft.extent, ox = (x - vx * f) * S, oy = (y - vy * f) * S;
+        g.beginPath();
+        for (const ring of ft.rings) { ring.forEach(([a, b2], i) => i ? g.lineTo(a * s - ox, b2 * s - oy) : g.moveTo(a * s - ox, b2 * s - oy)); g.closePath(); }
+        g.fill('evenodd'); g.stroke();
+      }
+      g.globalCompositeOperation = 'source-in'; g.drawImage(img, 0, 0, S, S);
+      const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+      return { data: await blob.arrayBuffer() };
+    }); }
     map.addSource('shom', { type: 'raster', tileSize: 256, minzoom: 6, maxzoom: 16, bounds: [-61.88, -21.52, 56.14, 51.19],
-      tiles: ['https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.COASTALMAPS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png'],
+      tiles: ['shomsea://{z}/{x}/{y}'],
       attribution: 'Carte littorale © <a href="https://www.shom.fr" target="_blank">SHOM</a>-<a href="https://www.ign.fr" target="_blank">IGN</a> (<a href="https://www.geoportail.gouv.fr" target="_blank">Géoportail</a>)' });
     map.addLayer({ id: 'shom', type: 'raster', source: 'shom', layout: { visibility: 'none' } });
     // Cartes marines électroniques de l'IHM (Instituto Hidrográfico de la Marina), côtes d'Espagne, accès public
@@ -3906,7 +3931,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=214`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=215`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
