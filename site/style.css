@@ -721,4 +721,3 @@ body.tide .wave-scale, body.tide .fab-undo, body.tide .fab-close { display: none
   .wave-fab.folded .fab-fold::before { content: ""; position: absolute; inset: -8px 0 -8px -14px; } /* zone de toucher plus large */
 }
 
-.orc-pick { width: 100%; min-height: 48px; font-size: 15px; text-align: left; padding: 0 12px; background: #fff; }
