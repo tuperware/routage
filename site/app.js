@@ -660,7 +660,51 @@
     const y = Math.min(N - 1, Math.floor((ty + TILE - lat) * MASK_RES));
     return m[y * N + x] === 1;
   }
+  // Pleine mer : si toutes les tuiles z10 autour du segment sont de la mer sans danger ni côte précise,
+  // le résultat est le même qu'en vérifiant point par point, mais beaucoup plus vite (traversées océaniques).
+  const pureC = new Map(); let pureSig = '', portPar = null;
+  function pureSea(x, y) {
+    const k = `${x}/${y}`; let v = pureC.get(k); if (v !== undefined) return v;
+    v = true;
+    const f = fineOn ? fine.get(k) : undefined;
+    if (f !== undefined && f !== 'S') v = false;
+    else if (f === undefined) {
+      if (!maskIndex) v = false;
+      else {
+        const n = 1 << FZ, la = j => Math.atan(Math.sinh(Math.PI * (1 - 2 * j / n))) * 180 / Math.PI, lo = i => i / n * 360 - 180;
+        // masque grossier : chaque pixel couvert par la tuile doit être de la mer
+        const N = TILE * MASK_RES, laN = la(y), laS = la(y + 1), loW = lo(x), loE = lo(x + 1);
+        for (let py = Math.floor(laS * MASK_RES) - 1; v && py <= Math.floor(laN * MASK_RES) + 1; py++) {
+          for (let px = Math.floor(loW * MASK_RES) - 1; px <= Math.floor(loE * MASK_RES) + 1; px++) {
+            const lat = (py + 0.5) / MASK_RES, lon = (px + 0.5) / MASK_RES, tk = tileKey(lat, lon), iv = maskIndex[tk];
+            if (!iv) { px = (Math.floor(lon / TILE) + 1) * TILE * MASK_RES - 1; continue; } // tuile 10° toute en mer
+            if (iv === 1) { v = false; break; }
+            const m = masks.get(tk); if (!m) { v = false; break; }
+            const tx = Math.floor(lon / TILE) * TILE, ty = Math.floor(lat / TILE) * TILE;
+            const xx = Math.min(N - 1, Math.floor((lon - tx) * MASK_RES)), yy = Math.min(N - 1, Math.floor((ty + TILE - lat) * MASK_RES));
+            if (m[yy * N + xx] === 1) { v = false; break; }
+          }
+        }
+      }
+    }
+    if (v && fineOn && hazOn && haz.has(k) && !(hazMask(k) === 'S' && hazPtsMask(k) === 'S')) v = false;
+    if (v && portPar && portPar.has(k)) v = false;
+    pureC.set(k, v); return v;
+  }
+  function seaBox(a, b) {
+    const sig = `${fineOn}|${hazOn}|${fine.size}|${haz.size}|${port.size}|${masks.size}|${!!maskIndex}|${hazDm}|${hazPtsOnly}|${OPT.dmin}`;
+    if (sig !== pureSig) {
+      pureSig = sig; pureC.clear();
+      portPar = port.size ? new Set([...port.keys()].map(k => { const [x, y] = k.split('/'); return `${x >> (PZ - FZ)}/${y >> (PZ - FZ)}`; })) : null;
+    }
+    const ta = fineKey(a.lat, a.lon), tb = fineKey(b.lat, b.lon);
+    const x0 = Math.floor(Math.min(ta.x, tb.x)), x1 = Math.floor(Math.max(ta.x, tb.x)), y0 = Math.floor(Math.min(ta.y, tb.y)), y1 = Math.floor(Math.max(ta.y, tb.y));
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 16) return false;
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) if (!pureSea(x, y)) return false;
+    return true;
+  }
   function segmentClear(a, b) {
+    if (seaBox(a, b)) return true;
     const km = distNm(a, b) * 1.852;
     const n = Math.max(2, Math.ceil(km / 0.45));
     let nearFine = false;
@@ -1487,7 +1531,7 @@
   const dfmt = new Intl.DateTimeFormat('fr-CH', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const tfmt = new Intl.DateTimeFormat('fr-CH', { hour: '2-digit', minute: '2-digit' });
   const hfmt = new Intl.DateTimeFormat('fr-CH', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-  const fmtDur = h => { const m = Math.round(h * 60), d = Math.floor(m / 1440); if (d) return `${d} j ${Math.round((m - d * 1440) / 60)} h`; return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`; };
+  const fmtDur = h => { const m = Math.round(h * 60), d = Math.floor(m / 1440); if (d) { const hh = Math.round(h); return `${Math.floor(hh / 24)} j ${hh % 24} h`; } return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`; };
   const fmtPos = p => {
     const f = (v, pos, neg) => { const t = Math.round(Math.abs(v) * 600), d = Math.floor(t / 600), m = (t % 600) / 10; return `${d}°${m.toFixed(1).replace('.', ',')}′ ${v >= 0 ? pos : neg}`; };
     return `${f(p.lat, 'N', 'S')}  ${f(p.lon, 'E', 'O')}`;
@@ -3910,7 +3954,7 @@
   // Icône du logiciel : onglet du navigateur tout de suite ; appli Android au prochain démarrage
   function appIcon() {
     const k = ['c', 'm'].includes(OPT.ico) ? OPT.ico : 't';
-    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=216`;
+    const l = document.querySelector('link[rel="icon"]'); if (l) l.href = `ico/${k}-64.png?v=217`;
     try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppIcon; if (P) Promise.resolve(P.set({ kind: k })).catch(() => {}); else if (window.Capacitor && window.Capacitor.nativePromise) window.Capacitor.nativePromise('AppIcon', 'set', { kind: k }).catch(() => {}); } catch (e) {}
   }
   { const ib = el('o-ico').querySelector(`button[data-v="${OPT.ico || 't'}"]`); if (ib) { el('ico-cur-pv').innerHTML = ib.querySelector('.ico-pv').innerHTML; el('ico-cur-txt').textContent = ib.textContent; } }
